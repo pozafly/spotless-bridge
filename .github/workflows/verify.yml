@@ -1,0 +1,25 @@
+name: Spotless Bridge verification
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gradle-and-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify DSL, formatter output and persistent worker
+        run: ./gradlew --no-daemon --console=plain check engineDist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spotless-bridge-engine
+          path: build/engine/
+          if-no-files-found: error
