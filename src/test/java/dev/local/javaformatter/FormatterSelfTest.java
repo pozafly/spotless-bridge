@@ -108,6 +108,26 @@ public final class FormatterSelfTest {
             Path added = file.resolveSibling("NewFile.java");
             Files.writeString(added, SOURCE);
             check(formatter.format(added, SOURCE).contains("SCRIPT"), "new target triggers membership refresh");
+            // A path requested before its first save must not become a cached target exclusion.
+            Path pending = file.resolveSibling("CreatedAfterRequest.java");
+            check(!Files.exists(pending), "pending source does not exist yet");
+            check(formatter.format(pending, SOURCE).equals(SOURCE), "missing source remains unchanged");
+            imported = formatter.importCount();
+            long beforeCreationPid = formatter.workerPid();
+            Files.writeString(pending, SOURCE);
+            String createdOutput = formatter.format(pending, SOURCE);
+            check(
+                    createdOutput.equals(gradleOutput(root, pending, SOURCE)),
+                    "previously missing target matches Gradle after creation");
+            check(formatter.importCount() == imported + 1, "created target refreshes membership once");
+            check(formatter.workerPid() != beforeCreationPid, "created target replaces stale worker");
+            imported = formatter.importCount();
+            long createdPid = formatter.workerPid();
+            check(formatter.format(pending, SOURCE).equals(createdOutput), "created target remains formatted");
+            check(formatter.importCount() == imported && formatter.workerPid() == createdPid,
+                    "created target reuses refreshed worker");
+            check(Files.readString(pending).equals(SOURCE), "new target source is not written by engine");
+            System.out.println("PASS: missing path, later creation, Gradle parity and refreshed worker reuse");
             Files.writeString(build, "this is not valid Gradle!\n");
             try {
                 formatter.format(file, SOURCE);

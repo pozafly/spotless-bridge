@@ -52,7 +52,8 @@ public final class GradleFormatter implements AutoCloseable {
                 metadata == null || (!metadata.containsKey("target." + canonical) && !excluded.contains(canonical));
         if (worker == null || !current.equals(fingerprint) || unknown) reload(current);
         if (!metadata.containsKey("target." + canonical)) {
-            excluded.add(canonical);
+            // Missing paths can become targets on their first save; do not cache them as exclusions.
+            if (Files.isRegularFile(canonical)) excluded.add(canonical);
             return source;
         }
         WorkerClient selected = worker;
