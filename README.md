@@ -76,7 +76,7 @@ The Gradle plugin does **not** automatically copy the Python hook into your proj
 For now, copy it from the local source checkout containing these changes.
 
 After public releases are available, download the source archive for the `v<version>` release
-matching your Gradle plugin version from the [repository's releases](https://github.com/pozafly/java-formatter-server/releases).
+matching your Gradle plugin version from the [repository's releases](https://github.com/pozafly/spotless-bridge/releases).
 For example, plugin `0.5.0` should use source tag `v0.5.0`. That release/tag does not exist yet.
 Use a fixed release rather than the moving `main` branch.
 

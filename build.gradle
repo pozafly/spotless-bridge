@@ -1,7 +1,7 @@
 plugins { id 'com.gradle.plugin-publish' version '2.2.1' }
 gradlePlugin {
-    website = 'https://github.com/pozafly/java-formatter-server'
-    vcsUrl = 'https://github.com/pozafly/java-formatter-server.git'
+    website = 'https://github.com/pozafly/spotless-bridge'
+    vcsUrl = 'https://github.com/pozafly/spotless-bridge.git'
     plugins {
         spotlessBridge {
             id = 'io.github.pozafly.spotlessbridge'
