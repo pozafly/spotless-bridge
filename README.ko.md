@@ -6,7 +6,7 @@
 **IntelliJ와 AI hook이 Gradle 프로젝트별 공용 daemon을 사용합니다.** IDE가 꺼져 있어도
 hook이 daemon을 시작하고 재사용합니다. 전역 설치나 OS 시작 서비스는 필요하지 않습니다.
 
-현재 버전은 **0.5.0 개발 버전**이며 Gradle Plugin Portal·JetBrains Marketplace에는 아직 게시하지 않았습니다.
+첫 공개 배포 버전은 **0.1.0으로 준비 중**이며 Gradle Plugin Portal·JetBrains Marketplace에는 아직 게시하지 않았습니다.
 
 ## 프로젝트 설정
 
@@ -17,7 +17,7 @@ hook이 daemon을 시작하고 재사용합니다. 전역 설치나 OS 시작 �
 plugins {
     id 'java'
     id 'com.diffplug.spotless' version '8.10.2'
-    id 'io.github.pozafly.spotlessbridge' version '0.5.0'
+    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
 }
 repositories { mavenCentral() }
 spotless {
@@ -29,7 +29,7 @@ spotless {
 }
 ```
 
-Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.5.0"`을 사용합니다.
+Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.0"`을 사용합니다.
 다중 모듈도 daemon 플러그인은 루트에 한 번 적용합니다. 각 모듈의 Spotless 설정은 따로 유지됩니다.
 JDK 21과 Gradle wrapper가 필요합니다. 현재 자동 검증 기준은 Gradle 8.14.3입니다.
 로컬 검증은 macOS에서 수행했고 CI는 Linux를 대상으로 합니다. Windows와 Gradle 9는 검증하지 않았습니다.
@@ -50,7 +50,7 @@ pluginManagement {
 ```
 
 이 경로는 개발 중에만 필요합니다. Plugin Portal 게시 후에는 로컬 저장소 선언을 제거합니다.
-현재 공개 저장소만으로 `0.5.0`을 다운로드할 수는 없습니다.
+현재 공개 저장소만으로 `0.1.0`을 다운로드할 수는 없습니다.
 
 ## AI hook
 
@@ -59,7 +59,7 @@ Python 3와 JDK 21이 필요하며, 첫 실행에서 사용할 `JAVA_HOME`을 JD
 
 현재는 **이 변경이 포함된 로컬 소스**에서 아래 두 파일을 복사합니다. 공개 Release와 태그는 아직 없습니다.
 공개 배포 후에는 Gradle 플러그인 버전과 일치하는 `v<version>` Release의 소스 압축 파일을 내려받아
-같은 방식으로 설치합니다. 예를 들어 플러그인 `0.5.0`에는 `v0.5.0` 소스를 사용하며 `main`을 따라가지 않습니다.
+같은 방식으로 설치합니다. 예를 들어 플러그인 `0.1.0`에는 `v0.1.0` 소스를 사용하며 `main`을 따라가지 않습니다.
 
 소비 프로젝트의 Gradle 루트에서 실행합니다. 경로는 실제 소스 위치로 바꾸세요.
 
@@ -112,7 +112,7 @@ OpenRewrite를 함께 사용하면 `Rewrite → daemon 포맷 → spotlessCheck�
 JAVA_HOME=/path/to/jdk21 ./gradlew clean build pluginZip
 ```
 
-`build/distributions/spotless-bridge-0.5.0.zip`은 **IDE 연결 코드만** 포함합니다.
+`build/distributions/spotless-bridge-0.1.0.zip`은 **IDE 연결 코드만** 포함합니다.
 실행 엔진 버전은 프로젝트의 Gradle 플러그인이 소유합니다.
 IDE SDK는 ZIP 빌드에만 필요합니다. 현재 ZIP 빌드는 macOS 앱 디렉터리 구조를 전제로 하며,
 앱 경로는 `-PideaHome=/path/to/IntelliJ/Contents`로 지정할 수 있습니다.

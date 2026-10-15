@@ -6,7 +6,7 @@ A persistent Java formatter that uses your project's existing Spotless configura
 **IntelliJ and AI hooks share one daemon per Gradle project.** Hooks can start and reuse it while
 IntelliJ is closed. No global installation or operating system service is required.
 
-**Status:** `0.5.0` is a development version. It has not been published to the Gradle Plugin Portal
+**Status:** `0.1.0` is being prepared as the first public release. It has not been published to the Gradle Plugin Portal
 or JetBrains Marketplace. There is no public release/tag for this version yet; use the local
 installation below with a source checkout containing these changes.
 
@@ -31,7 +31,7 @@ The following formatter versions and rules are examples:
 plugins {
     id 'java'
     id 'com.diffplug.spotless' version '8.10.2'
-    id 'io.github.pozafly.spotlessbridge' version '0.5.0'
+    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
 }
 repositories { mavenCentral() }
 spotless {
@@ -43,7 +43,7 @@ spotless {
 }
 ```
 
-For Kotlin DSL, use `id("io.github.pozafly.spotlessbridge") version "0.5.0"` in `plugins`.
+For Kotlin DSL, use `id("io.github.pozafly.spotlessbridge") version "0.1.0"` in `plugins`.
 
 ### Local installation before publication
 
@@ -68,7 +68,7 @@ pluginManagement {
 
 Use double quotes instead of single quotes in `settings.gradle.kts`. Replace the path with the
 actual source checkout location. After Portal publication, the local Maven entry can be removed.
-Public repositories cannot resolve `0.5.0` yet.
+Public repositories cannot resolve `0.1.0` yet.
 
 ## Install the AI hook in your project
 
@@ -77,7 +77,7 @@ For now, copy it from the local source checkout containing these changes.
 
 After public releases are available, download the source archive for the `v<version>` release
 matching your Gradle plugin version from the [repository's releases](https://github.com/pozafly/spotless-bridge/releases).
-For example, plugin `0.5.0` should use source tag `v0.5.0`. That release/tag does not exist yet.
+For example, plugin `0.1.0` should use source tag `v0.1.0`. That release/tag does not exist yet.
 Use a fixed release rather than the moving `main` branch.
 
 From your consuming project's Gradle root, copy the script and its license:
@@ -142,7 +142,7 @@ builds are not included. The ZIP build currently expects the macOS application l
 application path with `-PideaHome=/path/to/IntelliJ/Contents` if needed. The SDK is not needed for
 the Gradle plugin or headless checks.
 
-`build/distributions/spotless-bridge-0.5.0.zip` contains only the IDE adapter. The consuming project's
+`build/distributions/spotless-bridge-0.1.0.zip` contains only the IDE adapter. The consuming project's
 Gradle plugin selects the daemon engine version.
 
 1. Disable or uninstall the previous development plugin before installing this ZIP.
