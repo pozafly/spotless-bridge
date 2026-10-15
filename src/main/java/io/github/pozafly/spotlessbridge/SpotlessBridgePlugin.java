@@ -6,6 +6,15 @@ import org.gradle.api.*;
 
 /** The root project owns the engine version and exports its own Spotless configuration. */
 public final class SpotlessBridgePlugin implements Plugin<Project> {
+    /** Creates the plugin instance instantiated by Gradle. */
+    public SpotlessBridgePlugin() {}
+
+    /**
+     * Registers the daemon lifecycle and formatting tasks and installs the Spotless snapshot export script.
+     *
+     * @param project Gradle root project that owns the daemon configuration
+     * @throws GradleException if the plugin is applied to a subproject
+     */
     @Override
     public void apply(Project project) {
         if (project != project.getRootProject())

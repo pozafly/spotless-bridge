@@ -23,6 +23,15 @@ public final class WorkerClient implements AutoCloseable {
     });
     private volatile boolean closed;
 
+    /**
+     * Creates a client that starts its formatter child process on the first request.
+     *
+     * @param javaExecutable Java executable used to start the worker
+     * @param engineDirectory engine directory containing the worker's {@code lib} classpath
+     * @param errorLog file to which worker standard error is appended
+     * @param snapshotDirectory exported formatter snapshot loaded by the worker
+     * @param timeout deadline for worker startup and each formatting response
+     */
     public WorkerClient(
             Path javaExecutable, Path engineDirectory, Path errorLog, Path snapshotDirectory, Duration timeout) {
         this.javaExecutable = javaExecutable;
@@ -32,6 +41,16 @@ public final class WorkerClient implements AutoCloseable {
         this.timeout = timeout;
     }
 
+    /**
+     * Formats a buffer through the child process without writing the source file.
+     * Requests are serialized; a failed transport or timeout stops the worker so a later request can restart it.
+     *
+     * @param sourceFile source path used to select formatters from the snapshot
+     * @param source text to format, limited to 16 MiB when encoded as UTF-8
+     * @return formatted text returned by the worker
+     * @throws SourceException if the worker reports a formatter failure while keeping its session available
+     * @throws IOException if the client is closed, the size limit is exceeded, or worker communication fails
+     */
     public synchronized String format(Path sourceFile, String source) throws IOException {
         if (closed) throw new IOException("Formatter has been stopped");
         byte[] bytes = source.getBytes(StandardCharsets.UTF_8);
@@ -103,6 +122,11 @@ public final class WorkerClient implements AutoCloseable {
         }
     }
 
+    /**
+     * Returns the process ID recorded in the current worker session without checking process liveness.
+     *
+     * @return worker process ID, or {@code -1} if there is no session
+     */
     public long pid() {
         Session session = active.get();
         return session == null ? -1 : session.process.pid();
@@ -113,6 +137,9 @@ public final class WorkerClient implements AutoCloseable {
         session.process.destroyForcibly();
     }
 
+    /**
+     * Closes this client, terminates its child process, and shuts down its timeout scheduler.
+     */
     @Override
     public void close() {
         closed = true;
@@ -121,7 +148,15 @@ public final class WorkerClient implements AutoCloseable {
         timer.shutdownNow();
     }
 
+    /**
+     * A formatter failure reported in a complete worker response, allowing the worker session to remain in use.
+     */
     public static final class SourceException extends IOException {
+        /**
+         * Creates an exception carrying the worker's formatter diagnostic.
+         *
+         * @param message formatter failure description
+         */
         public SourceException(String message) {
             super(message);
         }

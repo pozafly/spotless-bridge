@@ -24,6 +24,15 @@ public final class GradleFormatter implements AutoCloseable {
     private final Set<Path> excluded = new HashSet<>();
     private int imports;
 
+    /**
+     * Creates a client for a project's shared daemon. Gradle evaluation is deferred until a request needs it.
+     *
+     * @param root existing Gradle root project directory
+     * @param javaHome JDK home used to launch the project's Gradle wrapper
+     * @param extraWatch additional configuration paths watched by this client
+     * @param importing callback invoked before this client evaluates Gradle
+     * @throws IOException if the project root cannot be resolved or daemon state cannot be created
+     */
     public GradleFormatter(Path root, Path javaHome, List<Path> extraWatch, Runnable importing) throws IOException {
         this.root = root.toRealPath();
         this.javaHome = javaHome;
@@ -33,6 +42,15 @@ public final class GradleFormatter implements AutoCloseable {
         watchedRoots = List.of(this.root);
     }
 
+    /**
+     * Formats an in-memory buffer using the project's current Spotless configuration without writing the file.
+     *
+     * @param file source file path used to select the applicable formatters
+     * @param source current editor buffer
+     * @return formatted text, or the original text if the file is not a Spotless target
+     * @throws IOException if the client is closed, configuration loading or formatting fails,
+     *     or configuration changes during formatting
+     */
     public synchronized String format(Path file, String source) throws IOException {
         if (closed) throw new IOException("Formatter is stopped");
         Path canonical = file.toFile().getCanonicalFile().toPath();
@@ -74,12 +92,22 @@ public final class GradleFormatter implements AutoCloseable {
         return endpoint;
     }
 
+    /**
+     * Invalidates this client's configuration and exclusion cache so the next request reevaluates Gradle.
+     * The shared daemon remains running.
+     */
     public synchronized void refresh() {
         fingerprint = "";
         excluded.clear();
     }
 
-    /** Project-installed command-line client used by hooks; warm requests do not invoke Gradle. */
+    /**
+     * Runs the project-installed hook client and formats the listed files on disk.
+     * Known targets reuse the daemon while its configuration remains valid.
+     *
+     * @param args Gradle root directory followed by a UTF-8 file containing one source path per line
+     * @throws Exception if configuration preparation, file access, or formatting fails
+     */
     public static void main(String[] args) throws Exception {
         Path root = Path.of(args[0]).toRealPath(), list = Path.of(args[1]);
         try (GradleFormatter client =
@@ -146,6 +174,15 @@ public final class GradleFormatter implements AutoCloseable {
         return fingerprint(root, watchedRoots, extraWatch);
     }
 
+    /**
+     * Hashes the tracked configuration paths and their contents, including Gradle user-home properties and init scripts.
+     *
+     * @param root canonical Gradle root directory used to distinguish internal and external build roots
+     * @param watchedRoots project and included-build directories recorded in the snapshot
+     * @param extraWatch additional configuration files or directories to inspect
+     * @return hexadecimal SHA-256 fingerprint of the tracked inputs
+     * @throws IOException if a tracked path cannot be traversed or read
+     */
     public static String fingerprint(Path root, List<Path> watchedRoots, List<Path> extraWatch) throws IOException {
         SortedSet<Path> paths = new TreeSet<>();
         for (Path watched : watchedRoots) collect(watched, !watched.startsWith(root), paths);
@@ -211,10 +248,20 @@ public final class GradleFormatter implements AutoCloseable {
         });
     }
 
+    /**
+     * Returns the number of Gradle configuration reloads completed by this client.
+     *
+     * @return this client's completed reload count
+     */
     public synchronized int importCount() {
         return imports;
     }
 
+    /**
+     * Queries the shared daemon for its current formatter worker process.
+     *
+     * @return worker process ID, or {@code -1} if no worker is registered or the daemon cannot be queried
+     */
     public long workerPid() {
         try {
             return SharedDaemon.workerPid(root);
@@ -227,6 +274,10 @@ public final class GradleFormatter implements AutoCloseable {
         return System.getProperty("os.name").startsWith("Windows");
     }
 
+    /**
+     * Closes this client and stops any Gradle export process it owns.
+     * The project daemon remains available to other clients.
+     */
     @Override
     public void close() {
         closed = true;

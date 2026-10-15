@@ -17,6 +17,16 @@ public final class SharedDaemon {
     private static final int MAGIC = 0x534C4432, MAX = 16 * 1024 * 1024;
     private static final String PROTOCOL = "2";
 
+    /** Creates a stateless helper; daemon operations are exposed through static methods. */
+    public SharedDaemon() {}
+
+    /**
+     * Creates the project-local daemon state and snapshot directories if needed.
+     *
+     * @param root existing Gradle root directory
+     * @return canonical project-local daemon state directory
+     * @throws IOException if the root cannot be resolved or state directories cannot be created or secured
+     */
     public static Path state(Path root) throws IOException {
         Path state = root.toRealPath().resolve(".gradle/spotless-bridge");
         Files.createDirectories(state.resolve("snapshots"));
@@ -28,6 +38,13 @@ public final class SharedDaemon {
         return state;
     }
 
+    /**
+     * Loads a Java properties file.
+     *
+     * @param path properties file to read
+     * @return loaded properties
+     * @throws IOException if the file cannot be opened or read
+     */
     public static Properties read(Path path) throws IOException {
         Properties properties = new Properties();
         try (InputStream in = Files.newInputStream(path)) {
@@ -48,6 +65,13 @@ public final class SharedDaemon {
         }
     }
 
+    /**
+     * Reads the saved endpoint and checks its protocol and project identity without testing server liveness.
+     *
+     * @param root Gradle root directory
+     * @return saved daemon connection properties
+     * @throws IOException if the endpoint cannot be read or belongs to an incompatible protocol or project
+     */
     public static Properties endpoint(Path root) throws IOException {
         Properties endpoint = read(root.toRealPath().resolve(".gradle/spotless-bridge/endpoint.properties"));
         if (!PROTOCOL.equals(endpoint.getProperty("protocol"))
@@ -56,11 +80,25 @@ public final class SharedDaemon {
         return endpoint;
     }
 
+    /**
+     * Loads the snapshot metadata referenced by an endpoint.
+     *
+     * @param endpoint daemon connection properties containing the snapshot path
+     * @return exported snapshot metadata
+     * @throws IOException if the metadata cannot be read
+     */
     public static Properties metadata(Properties endpoint) throws IOException {
         return read(Path.of(endpoint.getProperty("snapshot"), "snapshot.properties"));
     }
 
-    /** Called inside Gradle, after it has evaluated and exported the complete current target set. */
+    /**
+     * Installs an exported snapshot, starting or reusing the project daemon and updating its client runtime.
+     * Called inside Gradle after evaluation and export of the complete current target set.
+     *
+     * @param root Gradle root directory
+     * @param snapshot directory containing the exported formatters and target metadata
+     * @throws Exception if snapshot installation or daemon startup or communication fails
+     */
     public static synchronized void install(Path root, Path snapshot) throws Exception {
         root = root.toRealPath();
         Path state = state(root);
@@ -178,6 +216,12 @@ public final class SharedDaemon {
         return HexFormat.of().formatHex(digest.digest());
     }
 
+    /**
+     * Reads the configuration watch roots exported into a snapshot.
+     *
+     * @param metadata valid snapshot metadata containing the watch entries
+     * @return project and included-build paths recorded in the snapshot
+     */
     public static List<Path> watchedRoots(Properties metadata) {
         List<Path> roots = new ArrayList<>();
         for (int i = 0; i < Integer.parseInt(metadata.getProperty("watch.count")); i++)
@@ -185,11 +229,27 @@ public final class SharedDaemon {
         return roots;
     }
 
+    /**
+     * Sends an in-memory buffer to the daemon using the endpoint's snapshot key without writing the source file.
+     *
+     * @param endpoint saved daemon connection properties
+     * @param file source path used to select formatters
+     * @param source text to format
+     * @return formatted text returned by the daemon
+     * @throws IOException if path resolution, communication, snapshot validation, or formatting fails
+     */
     public static String format(Properties endpoint, Path file, String source) throws IOException {
         return request(
                 endpoint, "format", endpoint.getProperty("key"), file.toFile().getCanonicalPath(), source);
     }
 
+    /**
+     * Pings the project's saved daemon endpoint.
+     *
+     * @param root Gradle root directory
+     * @return daemon process ID, or {@code -1} if the endpoint is missing or the connection is refused
+     * @throws IOException if another endpoint or communication error prevents the status check
+     */
     public static long status(Path root) throws IOException {
         try {
             return Long.parseLong(request(endpoint(root), "ping", "", "", ""));
@@ -198,6 +258,13 @@ public final class SharedDaemon {
         }
     }
 
+    /**
+     * Requests an authenticated daemon shutdown and waits for it to finish.
+     * A missing endpoint or refused connection is treated as an already stopped daemon.
+     *
+     * @param root Gradle root directory
+     * @throws Exception if communication fails or the daemon does not stop within the timeout
+     */
     public static void stop(Path root) throws Exception {
         Properties endpoint;
         try {
@@ -263,6 +330,15 @@ public final class SharedDaemon {
         out.write(bytes);
     }
 
+    /**
+     * Formats listed files on disk using an already installed daemon snapshot.
+     * Each changed file is written after checking its original contents and tracked configuration;
+     * files written before a later failure are not rolled back. Non-target files are skipped.
+     *
+     * @param root Gradle root directory
+     * @param list UTF-8 file with one absolute or root-relative source path per line
+     * @throws Exception if file access, formatting, encoding, or concurrent-change validation fails
+     */
     public static void apply(Path root, Path list) throws Exception {
         Properties endpoint = endpoint(root);
         Properties metadata = metadata(endpoint);
@@ -292,6 +368,13 @@ public final class SharedDaemon {
         }
     }
 
+    /**
+     * Runs the authenticated loopback server. This internal entry point is launched by {@link #install}.
+     *
+     * @param args root directory, engine directory, engine identifier, one-use token file,
+     *     snapshot directory, snapshot key, and idle timeout in seconds, in that order
+     * @throws Exception if server setup, snapshot loading, or server operation fails
+     */
     public static void main(String[] args) throws Exception {
         Path root = Path.of(args[0]), engine = Path.of(args[1]);
         Path state = state(root), endpointPath = state.resolve("endpoint.properties");
@@ -394,6 +477,13 @@ public final class SharedDaemon {
         }
     }
 
+    /**
+     * Queries the daemon's current formatter worker session.
+     *
+     * @param root Gradle root directory
+     * @return worker process ID, or {@code -1} if no worker session exists
+     * @throws IOException if the endpoint cannot be read or the daemon cannot be queried
+     */
     public static long workerPid(Path root) throws IOException {
         return Long.parseLong(request(endpoint(root), "workerPid", "", "", ""));
     }

@@ -13,6 +13,16 @@ import java.util.*;
 public final class Worker {
     private static final int MAX_BYTES = 16 * 1024 * 1024;
 
+    /** Creates an entry-point holder; use {@link #main} to run the worker protocol. */
+    public Worker() {}
+
+    /**
+     * Loads exported project formatters and serves buffer-formatting requests over standard input and output.
+     * Source files are not written. The worker exits when its input closes or its parent process exits.
+     *
+     * @param args one argument containing the exported snapshot directory
+     * @throws Exception if snapshot loading, protocol processing, or formatter cleanup fails
+     */
     public static void main(String[] args) throws Exception {
         // An abruptly killed daemon cannot run close(); its worker must not remain orphaned.
         ProcessHandle.current()
