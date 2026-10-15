@@ -2,7 +2,7 @@
 
 ## 소유권과 호환성
 
-도구 버전은 `gradle.properties`에서 관리합니다. 소비 프로젝트는 Gradle 플러그인 버전을 선택하고,
+도구 버전은 `gradle.properties`에서 관리하며 `selfTest` 인자로 전달해 Groovy/Kotlin 소비 프로젝트에서도 같은 버전을 사용합니다. 소비 프로젝트는 Gradle 플러그인 버전을 선택하고,
 별도로 Spotless·포매터 버전과 규칙을 소유합니다. IDE ZIP에는 연결 코드만 들어갑니다.
 
 `SpotlessBridgePlugin`은 루트 프로젝트에 시작·적용·상태·종료 태스크를 등록합니다.
@@ -11,7 +11,7 @@
 `Worker`는 실제 프로젝트 라이브러리의 `Formatter`·`DirtyState`를 복원·호출합니다.
 
 Spotless 내부 API 변경이나 직렬화 불가 단계는 실패할 수 있습니다. 임의 버전·이전 설정으로 대체하지 않습니다.
-`ratchetFrom`은 지원하지 않습니다. Gradle configuration cache와 isolated projects도 지원하지 않습니다.
+`ratchetFrom`은 지원하지 않습니다. Gradle configuration cache와 isolated projects도 지원하지 않으며 plugin compatibility 메타데이터에 둘 다 `false`로 선언합니다.
 
 ## 프로세스와 통신
 
@@ -44,8 +44,8 @@ JAVA_HOME=/path/to/jdk21 ./gradlew clean build pluginZip
 - 기존 `FormatterSelfTest`: Groovy/Kotlin DSL, Spotless 8.10.2/8.0.0, Palantir/Google/Eclipse,
   Gradle 결과 비교, 신규·제외 파일, 없는 파일 요청 후 생성, 설정 변경·실패·복구, 다중 모듈.
 - `ProcessSelfTest`: 문법 오류, worker 재사용·강제 종료 후 복구, timeout, 종료.
-- `SharedDaemonSelfTest`: 편집기 연결 종료 후 실제 `scripts/ai-hook.py` 실행,
-  반복 hook의 Gradle 호출 0회, 시작·설정 변경 시 1회, 공용 PID/worker, 80개 동시 요청, hook만의 시작, stale endpoint 복구, 잘못된 토큰 거부,
+- `SharedDaemonSelfTest`: `scripts/ai-hook.py`와 `LICENSE`를 임시 소비 프로젝트로 복사한 뒤 편집기 연결 종료 후 hook 실행,
+  설정이 같은 등록 대상 파일의 반복 hook에서 Gradle 호출 0회, 시작·설정 변경 시 1회, 공용 PID/worker, 80개 동시 요청, hook만의 시작, stale endpoint 복구, 잘못된 토큰 거부,
   UTF-16LE·CRLF Gradle byte 일치, 외부 includeBuild를 포함한 설정 갱신, 동시 시작, stop과 idle 종료.
 
 CI는 SDK 없는 `check engineDist`를 실행합니다. 실제 IntelliJ UI 저장 동작·Plugin Verifier·
@@ -56,7 +56,15 @@ Marketplace 승인과 별개입니다. SDK는 `pluginZip`에만 필요합니다.
 `com.gradle.plugin-publish`로 구현 JAR, sources/javadoc, plugin marker와 Portal 메타데이터를 생성합니다.
 `./gradlew publishAllPublicationsToTestRepository`는 로컬 파일 저장소에만 게시합니다. `-PspotlessBridgeRepository=/path/to/project/.gradle/spotless-bridge-repository`로 게시 위치를 지정할 수 있습니다.
 
-공개 게시 전 버전, GitHub 저장소 주소, 라이선스, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
+라이선스는 MIT이며 `LICENSE`를 모든 JAR의 `META-INF`에 포함하고 Maven POM에도 기록합니다.
+기본 사용 문서는 영문 `README.md`, 한국어 문서는 `README.ko.md`입니다. 동작이나 설치 방법이 바뀌면 둘 다 갱신합니다.
+
+hook 스크립트는 소비 프로젝트에 자동 설치하지 않습니다. 공개 출시 시 버전과 같은 `v<version>` 태그의
+소스 압축 파일에 `scripts/ai-hook.py`와 `LICENSE`가 포함되어야 합니다. 사용자는 두 파일을
+프로젝트의 `tools/spotless-bridge/`로 복사하고 플러그인과 함께 버전을 갱신합니다.
+공개 출시 전에는 README의 로컬 복사 절차를 사용합니다. Release/태그를 실제로 공개한 뒤 미게시 안내를 갱신하세요.
+
+공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
 게시 자격 증명은 Git에 넣지 않습니다. API 키가 준비된 뒤 `publishPlugins --validate-only`로 확인하고,
 승인된 출시 작업에서 `publishPlugins`를 실행합니다. 두 옵션의 차이는
 [Gradle 공식 배포 문서](https://docs.gradle.org/current/userguide/publishing_gradle_plugins.html)를 참고하세요.
