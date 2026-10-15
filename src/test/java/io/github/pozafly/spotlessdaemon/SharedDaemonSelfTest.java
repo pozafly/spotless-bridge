@@ -130,7 +130,7 @@ public final class SharedDaemonSelfTest {
             check(text.contains("\r\n") && !text.replace("\r\n", "").contains("\n"), "disk CRLF preserved");
             // Ordinary Spotless must produce byte-identical output for the same selected file.
             Files.write(file, source.getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
-            gradle(root, "spotlessApply", "-PspotlessIdeHook=" + file);
+            gradle(root, "spotlessApply", "-PspotlessIdeHook=" + file.toRealPath());
             check(Arrays.equals(actual, Files.readAllBytes(file)), "UTF-16LE CRLF ordinary Gradle byte parity");
         } finally {
             Files.writeString(build, previous);
