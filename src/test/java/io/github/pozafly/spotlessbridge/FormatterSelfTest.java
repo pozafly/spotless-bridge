@@ -17,6 +17,7 @@ public final class FormatterSelfTest {
         Path engine = Path.of(args[0]);
         pluginRepositories = "pluginManagement { repositories { maven { url = uri('"
                 + Path.of(args[1]).toUri() + "') }; gradlePluginPortal() } }\n";
+        String bridgeVersion = args[2];
         String version = "8.10.2";
         Path temp = Files.createTempDirectory("spotless-bridge-test-");
         Path root = temp.resolve("fixture");
@@ -36,7 +37,7 @@ public final class FormatterSelfTest {
         Files.writeString(settings, pluginRepositories + "rootProject.name = 'formatter-test'\n");
         Path build = root.resolve("build.gradle");
         String initial = """
-                plugins { id 'java'; id 'com.diffplug.spotless' version '%s'; id 'io.github.pozafly.spotlessbridge' version '0.5.0' }
+                plugins { id 'java'; id 'com.diffplug.spotless' version '%s'; id 'io.github.pozafly.spotlessbridge' version '%s' }
                 repositories { mavenCentral() }
                 spotless { java {
                     target 'src/**/*.java'
@@ -46,7 +47,7 @@ public final class FormatterSelfTest {
                     palantirJavaFormat(providers.gradleProperty('palantirVersion').getOrElse('2.97.0'))
                 } }
                 apply from: 'format.gradle'
-                """.formatted(version);
+                """.formatted(version, bridgeVersion);
         Files.writeString(build, initial);
         Path script = root.resolve("format.gradle");
         Files.writeString(
@@ -262,7 +263,7 @@ public final class FormatterSelfTest {
                     "restore original Spotless version");
             System.out.println(
                     "PASS: project Spotless 8.10.2 -> 8.0.0 -> 8.10.2, Gradle parity and worker replacement");
-            kotlinDsl(temp, version, engine, javaHome);
+            kotlinDsl(temp, version, bridgeVersion, engine, javaHome);
             SharedDaemonSelfTest.run(root, file, SOURCE);
             System.out.println("ALL TESTS PASSED; fixture=" + temp);
         } finally {
@@ -270,7 +271,8 @@ public final class FormatterSelfTest {
         }
     }
 
-    private static void kotlinDsl(Path temp, String version, Path engine, Path javaHome) throws Exception {
+    private static void kotlinDsl(Path temp, String version, String bridgeVersion, Path engine, Path javaHome)
+            throws Exception {
         Path root = temp.resolve("kotlin-dsl");
         Path file = root.resolve("src/main/java/KotlinDsl.java");
         Files.createDirectories(file.getParent());
@@ -287,7 +289,7 @@ public final class FormatterSelfTest {
         Files.writeString(root.resolve("build.gradle.kts"), """
                 plugins {
                     java
-                    id("io.github.pozafly.spotlessbridge") version "0.5.0"
+                    id("io.github.pozafly.spotlessbridge") version "%s"
                     id("com.diffplug.spotless") version "%s"
                 }
                 repositories { mavenCentral() }
@@ -298,7 +300,7 @@ public final class FormatterSelfTest {
                         googleJavaFormat("1.30.0")
                     }
                 }
-                """.formatted(version));
+                """.formatted(bridgeVersion, version));
         try (GradleFormatter formatter = new GradleFormatter(root, javaHome, List.of(), () -> {})) {
             String result = formatter.format(file, SOURCE);
             check(

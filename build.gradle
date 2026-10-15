@@ -76,7 +76,9 @@ tasks.register('selfTest', JavaExec) {
     dependsOn testClasses, engineDist, publishAllPublicationsToTestRepository
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'io.github.pozafly.spotlessbridge.FormatterSelfTest'
-    args layout.buildDirectory.dir('engine').get().asFile.absolutePath, layout.buildDirectory.dir('repository').get().asFile.absolutePath
+    args layout.buildDirectory.dir('engine').get().asFile.absolutePath,
+            layout.buildDirectory.dir('repository').get().asFile.absolutePath,
+            project.version.toString()
     workingDir rootDir
 }
 tasks.named('check') { dependsOn 'selfTest' }

@@ -10,6 +10,11 @@ import java.util.concurrent.*;
 public final class SharedDaemonSelfTest {
     static void run(Path root, Path file, String source) throws Exception {
         Path javaHome = Path.of(System.getProperty("java.home"));
+        // Use the project-local installation documented in the README.
+        Path hookDirectory = root.resolve("tools/spotless-bridge");
+        Files.createDirectories(hookDirectory);
+        Files.copy(Path.of("scripts/ai-hook.py"), hookDirectory.resolve("ai-hook.py"));
+        Files.copy(Path.of("LICENSE"), hookDirectory.resolve("LICENSE"));
         // A new CLI initially knows only the root; a cached snapshot also watches this external included build.
         Path included = root.getParent().resolve("included-build");
         Files.createDirectories(included);
@@ -167,7 +172,7 @@ public final class SharedDaemonSelfTest {
         Path log = Files.createTempFile("shared-daemon-hook-", ".log");
         Process process = new ProcessBuilder(
                         "python3",
-                        Path.of("scripts/ai-hook.py").toAbsolutePath().toString(),
+                        root.resolve("tools/spotless-bridge/ai-hook.py").toAbsolutePath().toString(),
                         root.toString(),
                         file.toString())
                 .redirectErrorStream(true)
