@@ -1,11 +1,11 @@
-# Spotless Daemon 유지보수
+# Spotless Bridge 유지보수
 
 ## 소유권과 호환성
 
 도구 버전은 `gradle.properties`에서 관리합니다. 소비 프로젝트는 Gradle 플러그인 버전을 선택하고,
 별도로 Spotless·포매터 버전과 규칙을 소유합니다. IDE ZIP에는 연결 코드만 들어갑니다.
 
-`SpotlessDaemonPlugin`은 루트 프로젝트에 시작·적용·상태·종료 태스크를 등록합니다.
+`SpotlessBridgePlugin`은 루트 프로젝트에 시작·적용·상태·종료 태스크를 등록합니다.
 `export.gradle`은 그 프로젝트가 적용한 Spotless `spotlessJava` 태스크의 `stepsInternalRoundtrip`,
 인코딩, 줄바꿈 정책, 대상 파일을 읽습니다. 설정과 JAR 경로를 내보낸 뒤 daemon에 전달합니다.
 `Worker`는 실제 프로젝트 라이브러리의 `Formatter`·`DirtyState`를 복원·호출합니다.
@@ -16,7 +16,7 @@ Spotless 내부 API 변경이나 직렬화 불가 단계는 실패할 수 있습
 ## 프로세스와 통신
 
 - canonical Gradle root당 `SharedDaemon` 하나와 그 소유의 worker 하나입니다.
-- `.gradle/spotless-daemon/start.lock`은 시작·설정 갱신을 직렬화합니다.
+- `.gradle/spotless-bridge/start.lock`은 시작·설정 갱신을 직렬화합니다.
   `daemon.lock`은 프로세스 수명 동안 유지되어 중복 서버를 막습니다.
 - daemon은 루프백 TCP의 임의 포트에 바인딩하고 임의 토큰을 검사합니다.
   endpoint 파일은 임시 파일 작성 후 atomic move로 교체합니다.
@@ -54,7 +54,7 @@ Marketplace 승인과 별개입니다. SDK는 `pluginZip`에만 필요합니다.
 ## 배포 준비
 
 `com.gradle.plugin-publish`로 구현 JAR, sources/javadoc, plugin marker와 Portal 메타데이터를 생성합니다.
-`./gradlew publishAllPublicationsToTestRepository`는 로컬 파일 저장소에만 게시합니다. `-PspotlessDaemonRepository=/path/to/project/.gradle/spotless-daemon-repository`로 게시 위치를 지정할 수 있습니다.
+`./gradlew publishAllPublicationsToTestRepository`는 로컬 파일 저장소에만 게시합니다. `-PspotlessBridgeRepository=/path/to/project/.gradle/spotless-bridge-repository`로 게시 위치를 지정할 수 있습니다.
 
 공개 게시 전 버전, GitHub 저장소 주소, 라이선스, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
 게시 자격 증명은 Git에 넣지 않습니다. API 키가 준비된 뒤 `publishPlugins --validate-only`로 확인하고,

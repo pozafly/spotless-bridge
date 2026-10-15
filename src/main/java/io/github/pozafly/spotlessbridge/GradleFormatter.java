@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -108,7 +108,7 @@ public final class GradleFormatter implements AutoCloseable {
                         "--no-configuration-cache",
                         "--console=plain",
                         "--quiet",
-                        ":spotlessDaemonStart")
+                        ":spotlessBridgeStart")
                 .directory(root.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(log.toFile());
@@ -122,14 +122,14 @@ public final class GradleFormatter implements AutoCloseable {
         try {
             if (!process.waitFor(120, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                throw new IOException("Spotless Daemon 설정을 120초 안에 가져오지 못했습니다. 로그: " + log);
+                throw new IOException("Spotless Bridge 설정을 120초 안에 가져오지 못했습니다. 로그: " + log);
             }
             if (process.exitValue() != 0)
-                throw new IOException("Spotless Daemon 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log);
+                throw new IOException("Spotless Bridge 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log);
         } catch (InterruptedException interrupted) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
-            throw new IOException("Spotless Daemon 설정 불러오기가 취소되었습니다.", interrupted);
+            throw new IOException("Spotless Bridge 설정 불러오기가 취소되었습니다.", interrupted);
         } finally {
             exportProcess.compareAndSet(process, null);
         }

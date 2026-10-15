@@ -9,7 +9,7 @@ import tempfile
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('project', type=Path, help='Gradle root with io.github.pozafly.spotlessdaemon applied')
+    parser.add_argument('project', type=Path, help='Gradle root with io.github.pozafly.spotlessbridge applied')
     parser.add_argument('files', type=Path, nargs='*', help='Changed files, relative to the Gradle root or absolute')
     args = parser.parse_args()
     root = args.project.resolve(strict=True)
@@ -23,16 +23,16 @@ def main() -> int:
         selected = Path(temporary) / 'files.txt'
         selected.write_text(''.join(str(path) + '\n' for path in files), encoding='utf-8')
         wrapper = root / ('gradlew.bat' if os.name == 'nt' else 'gradlew')
-        runtime = root / '.gradle/spotless-daemon/client-runtime.txt'
+        runtime = root / '.gradle/spotless-bridge/client-runtime.txt'
         if not runtime.is_file():
             # First use downloads the project-selected engine. Subsequent invocations start the client directly.
             bootstrap = subprocess.run([str(wrapper), '--console=plain', '--no-configuration-cache',
-                                        'spotlessDaemonStart'], cwd=root, timeout=180)
+                                        'spotlessBridgeStart'], cwd=root, timeout=180)
             if bootstrap.returncode:
                 return bootstrap.returncode
         jar, java_home = runtime.read_text(encoding='utf-8').splitlines()
         java = Path(java_home) / 'bin' / ('java.exe' if os.name == 'nt' else 'java')
-        return subprocess.run([str(java), '-cp', jar, 'io.github.pozafly.spotlessdaemon.GradleFormatter',
+        return subprocess.run([str(java), '-cp', jar, 'io.github.pozafly.spotlessbridge.GradleFormatter',
                                str(root), str(selected)], cwd=root, timeout=180).returncode
 
 

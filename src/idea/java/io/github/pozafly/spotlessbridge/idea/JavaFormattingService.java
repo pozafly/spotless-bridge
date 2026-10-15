@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon.idea;
+package io.github.pozafly.spotlessbridge.idea;
 
 import com.intellij.formatting.service.*;
 import com.intellij.openapi.application.ReadAction;
@@ -34,12 +34,12 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
 
     @Override
     protected String getName() {
-        return "Spotless Daemon";
+        return "Spotless Bridge";
     }
 
     @Override
     protected String getNotificationGroupId() {
-        return "Spotless Daemon";
+        return "Spotless Bridge";
     }
 
     @Override

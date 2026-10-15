@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.nio.file.*;
@@ -15,7 +15,7 @@ public final class ProcessSelfTest {
         Path snapshot = Path.of(args[1]);
         Path file = Path.of(args[2]);
         Path java = Path.of(System.getProperty("java.home"), "bin", "java");
-        Path log = Files.createTempFile("spotless-daemon-test-", ".log");
+        Path log = Files.createTempFile("spotless-bridge-test-", ".log");
         long child;
         try (WorkerClient client = new WorkerClient(java, engine, log, snapshot, Duration.ofSeconds(15))) {
             String formatted = client.format(file, SOURCE);

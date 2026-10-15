@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon.idea;
+package io.github.pozafly.spotlessbridge.idea;
 
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
@@ -8,7 +8,7 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ProjectRootManager;
-import io.github.pozafly.spotlessdaemon.GradleFormatter;
+import io.github.pozafly.spotlessbridge.GradleFormatter;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -27,7 +27,7 @@ public final class ProjectEngine implements Disposable {
         if (disposed || project.isDisposed()) throw new IOException("Project is closed");
         FormatterSettings.Values settings =
                 project.getService(FormatterSettings.class).getState();
-        if (!settings.enabled) throw new IOException("Spotless Daemon is disabled");
+        if (!settings.enabled) throw new IOException("Spotless Bridge is disabled");
         Path root;
         if (!settings.gradleRoot.isBlank()) root = Path.of(settings.gradleRoot).toRealPath();
         else {
@@ -35,7 +35,7 @@ public final class ProjectEngine implements Disposable {
             while (root != null && !Files.isRegularFile(root.resolve("gradle/wrapper/gradle-wrapper.jar")))
                 root = root.getParent();
             if (root == null)
-                throw new IOException("Gradle wrapper를 찾을 수 없습니다. Spotless Daemon 설정에서 Gradle 루트를 지정하세요.");
+                throw new IOException("Gradle wrapper를 찾을 수 없습니다. Spotless Bridge 설정에서 Gradle 루트를 지정하세요.");
             root = root.toRealPath();
         }
         GradleFormatter existing = builds.get(root);
@@ -46,7 +46,7 @@ public final class ProjectEngine implements Disposable {
                 Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
                 return sdk == null ? null : sdk.getHomePath();
             });
-        if (home == null || home.isBlank()) throw new IOException("Spotless Daemon 설정에서 JDK 21 경로를 지정하세요.");
+        if (home == null || home.isBlank()) throw new IOException("Spotless Bridge 설정에서 JDK 21 경로를 지정하세요.");
         List<Path> extraWatch = new ArrayList<>();
         for (String line : settings.extraWatch.lines().toList())
             if (!line.isBlank()) extraWatch.add(root.resolve(line.trim()).normalize());
@@ -55,9 +55,9 @@ public final class ProjectEngine implements Disposable {
                 Path.of(home),
                 extraWatch,
                 () -> NotificationGroupManager.getInstance()
-                        .getNotificationGroup("Spotless Daemon")
+                        .getNotificationGroup("Spotless Bridge")
                         .createNotification(
-                                "Spotless Daemon 설정 불러오는 중", "빌드 설정을 평가한 뒤 새 규칙으로 포맷합니다.", NotificationType.INFORMATION)
+                                "Spotless Bridge 설정 불러오는 중", "빌드 설정을 평가한 뒤 새 규칙으로 포맷합니다.", NotificationType.INFORMATION)
                         .notify(project));
         created.refresh();
         builds.put(root, created);

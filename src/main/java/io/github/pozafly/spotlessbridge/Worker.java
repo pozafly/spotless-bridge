@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.lang.reflect.*;
@@ -25,7 +25,7 @@ public final class Worker {
             metadata.load(in);
         }
         if (!"1".equals(metadata.getProperty("protocol")))
-            throw new IOException("Unsupported Spotless Daemon snapshot");
+            throw new IOException("Unsupported Spotless Bridge snapshot");
         List<LoadedFormatter> formatters = new ArrayList<>();
         try {
             for (int i = 0; i < Integer.parseInt(metadata.getProperty("formatters")); i++) {

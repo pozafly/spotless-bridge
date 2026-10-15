@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon.idea;
+package io.github.pozafly.spotlessbridge.idea;
 
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.project.Project;
@@ -18,13 +18,13 @@ public final class FormatterSettingsPage implements Configurable {
 
     @Override
     public String getDisplayName() {
-        return "Spotless Daemon";
+        return "Spotless Bridge";
     }
 
     @Override
     public JComponent createComponent() {
         JPanel panel = new JPanel(new GridLayout(0, 1, 0, 8));
-        enabled = new JCheckBox("이 프로젝트에서 Spotless Daemon 사용");
+        enabled = new JCheckBox("이 프로젝트에서 Spotless Bridge 사용");
         javaHome = new JTextField();
         panel.add(enabled);
         panel.add(new JLabel("JDK 21 홈 경로 (비워두면 프로젝트 SDK 사용)"));

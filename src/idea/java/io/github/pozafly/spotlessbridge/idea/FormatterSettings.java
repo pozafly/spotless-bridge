@@ -1,10 +1,10 @@
-package io.github.pozafly.spotlessdaemon.idea;
+package io.github.pozafly.spotlessbridge.idea;
 
 import com.intellij.openapi.components.*;
 import org.jetbrains.annotations.NotNull;
 
 @Service(Service.Level.PROJECT)
-@State(name = "SpotlessDaemonSettings", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
+@State(name = "SpotlessBridgeSettings", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class FormatterSettings implements PersistentStateComponent<FormatterSettings.Values> {
     public static final class Values {
         public boolean enabled;

@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -18,9 +18,9 @@ public final class FormatterSelfTest {
         pluginRepositories = "pluginManagement { repositories { maven { url = uri('"
                 + Path.of(args[1]).toUri() + "') }; gradlePluginPortal() } }\n";
         String version = "8.10.2";
-        Path temp = Files.createTempDirectory("spotless-daemon-test-");
+        Path temp = Files.createTempDirectory("spotless-bridge-test-");
         Path root = temp.resolve("fixture");
-        Path cache = root.resolve(".gradle/spotless-daemon/snapshots");
+        Path cache = root.resolve(".gradle/spotless-bridge/snapshots");
         Path file = root.resolve("src/main/java/Sample.java");
         Files.createDirectories(file.getParent());
         Files.writeString(file, SOURCE);
@@ -36,7 +36,7 @@ public final class FormatterSelfTest {
         Files.writeString(settings, pluginRepositories + "rootProject.name = 'formatter-test'\n");
         Path build = root.resolve("build.gradle");
         String initial = """
-                plugins { id 'java'; id 'com.diffplug.spotless' version '%s'; id 'io.github.pozafly.spotlessdaemon' version '0.5.0' }
+                plugins { id 'java'; id 'com.diffplug.spotless' version '%s'; id 'io.github.pozafly.spotlessbridge' version '0.5.0' }
                 repositories { mavenCentral() }
                 spotless { java {
                     target 'src/**/*.java'
@@ -61,7 +61,7 @@ public final class FormatterSelfTest {
                 root,
                 javaHome,
                 List.of(extra),
-                () -> System.out.println("Importing fixture Spotless Daemon configuration..."))) {
+                () -> System.out.println("Importing fixture Spotless Bridge configuration..."))) {
             String formatted = formatter.format(file, SOURCE);
             checkGolden("palantir", formatted);
             check(formatted.contains("import java.util.List;"), "initial shortening");
@@ -283,11 +283,11 @@ public final class FormatterSelfTest {
         Files.writeString(
                 root.resolve("settings.gradle.kts"),
                 pluginRepositories.replace("uri('", "uri(\"").replace("')", "\")")
-                        + "rootProject.name = \"spotless-daemon-kotlin-test\"\n");
+                        + "rootProject.name = \"spotless-bridge-kotlin-test\"\n");
         Files.writeString(root.resolve("build.gradle.kts"), """
                 plugins {
                     java
-                    id("io.github.pozafly.spotlessdaemon") version "0.5.0"
+                    id("io.github.pozafly.spotlessbridge") version "0.5.0"
                     id("com.diffplug.spotless") version "%s"
                 }
                 repositories { mavenCentral() }
@@ -313,7 +313,7 @@ public final class FormatterSelfTest {
     }
 
     private static int runGradle(Path root, String task) throws Exception {
-        Path log = Files.createTempFile("spotless-daemon-task-", ".log");
+        Path log = Files.createTempFile("spotless-bridge-task-", ".log");
         Process process = new ProcessBuilder(
                         Path.of(System.getProperty("java.home"), "bin", "java").toString(),
                         "-classpath",

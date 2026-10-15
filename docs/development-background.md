@@ -1,4 +1,4 @@
-# Spotless Daemon의 목적과 동작
+# Spotless Bridge의 목적과 동작
 
 > 이 문서는 0.4.0까지의 제작 배경입니다. 0.5.0에서는 Gradle 플러그인이 엔진을 배포하고
 > IntelliJ와 hook이 프로젝트별 daemon을 공유합니다. 현재 동작은 [README](../README.md)를 따릅니다.
@@ -7,10 +7,10 @@
 
 프로젝트의 Spotless 규칙을 IntelliJ 저장에서도 사용하면서, 반복 요청의 Gradle 실행과
 포매터 초기화 비용을 줄이려고 만든 도구입니다. 프로젝트가 버전과 규칙을 정하고,
-Spotless Daemon은 그 설정으로 포맷을 반복 실행합니다.
+Spotless Bridge는 그 설정으로 포맷을 반복 실행합니다.
 
 Formo 0.3.0은 Spotless 버전을 내부 Gradle 플러그인에서 고정하고 `formo {}` 설정과 별칭 태스크를
-제공했습니다. 0.4.0부터 이 계층을 제거하고 이름을 Spotless Daemon으로 바꿨습니다.
+제공했습니다. 0.4.0부터 이 계층을 제거했습니다. 현재 제품 이름은 Spotless Bridge입니다.
 OpenRewrite 연동과 별도 CLI는 현재 기능에 포함하지 않습니다.
 
 ## 실행 흐름
@@ -54,14 +54,14 @@ worker는 결과 텍스트만 반환하고 문서 반영·파일 저장은 Intel
 
 | 파일 | 역할 |
 | --- | --- |
-| [JavaFormattingService.java](../src/idea/java/io/github/pozafly/spotlessdaemon/idea/JavaFormattingService.java) | 저장·포맷 요청과 문서 결과 반영 |
-| [ProjectEngine.java](../src/idea/java/io/github/pozafly/spotlessdaemon/idea/ProjectEngine.java) | Gradle 루트별 엔진과 종료 처리 |
-| [GradleFormatter.java](../src/main/java/io/github/pozafly/spotlessdaemon/GradleFormatter.java) | 설정 변경 감지·Gradle 실행·재로딩 |
+| [JavaFormattingService.java](../src/idea/java/io/github/pozafly/spotlessbridge/idea/JavaFormattingService.java) | 저장·포맷 요청과 문서 결과 반영 |
+| [ProjectEngine.java](../src/idea/java/io/github/pozafly/spotlessbridge/idea/ProjectEngine.java) | Gradle 루트별 엔진과 종료 처리 |
+| [GradleFormatter.java](../src/main/java/io/github/pozafly/spotlessbridge/GradleFormatter.java) | 설정 변경 감지·Gradle 실행·재로딩 |
 | [export.gradle](../src/main/resources/export.gradle) | 프로젝트 Spotless 설정과 라이브러리 경로 추출 |
-| [WorkerClient.java](../src/main/java/io/github/pozafly/spotlessdaemon/WorkerClient.java) | 프로세스·통신·시간제한 |
-| [Worker.java](../src/main/java/io/github/pozafly/spotlessdaemon/Worker.java) | 프로젝트 라이브러리 로드와 포맷 실행 |
-| [FormatterSelfTest.java](../src/test/java/io/github/pozafly/spotlessdaemon/FormatterSelfTest.java) | Spotless 버전·설정 변경과 Gradle 결과 비교 |
-| [ProcessSelfTest.java](../src/test/java/io/github/pozafly/spotlessdaemon/ProcessSelfTest.java) | 프로세스 재사용·복구·동시 요청·종료 검증 |
+| [WorkerClient.java](../src/main/java/io/github/pozafly/spotlessbridge/WorkerClient.java) | 프로세스·통신·시간제한 |
+| [Worker.java](../src/main/java/io/github/pozafly/spotlessbridge/Worker.java) | 프로젝트 라이브러리 로드와 포맷 실행 |
+| [FormatterSelfTest.java](../src/test/java/io/github/pozafly/spotlessbridge/FormatterSelfTest.java) | Spotless 버전·설정 변경과 Gradle 결과 비교 |
+| [ProcessSelfTest.java](../src/test/java/io/github/pozafly/spotlessbridge/ProcessSelfTest.java) | 프로세스 재사용·복구·동시 요청·종료 검증 |
 
 지원 범위, 설정 감지 대상과 제한은 [README](../README.md), 버전별 검증 책임은
 [유지보수 문서](maintenance.md)에 정리했습니다. 과거 Formo 벤치마크 수치를 현재 버전의 측정값으로 사용하지 않습니다.

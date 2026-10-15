@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +17,7 @@ public final class WorkerClient implements AutoCloseable {
     private final Duration timeout;
     private final AtomicReference<Session> active = new AtomicReference<>();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(task -> {
-        Thread thread = new Thread(task, "Spotless Daemon timeout");
+        Thread thread = new Thread(task, "Spotless Bridge timeout");
         thread.setDaemon(true);
         return thread;
     });
@@ -44,7 +44,7 @@ public final class WorkerClient implements AutoCloseable {
                             "-Xmx256m",
                             "-cp",
                             engineDirectory.resolve("lib/*").toString(),
-                            "io.github.pozafly.spotlessdaemon.Worker",
+                            "io.github.pozafly.spotlessbridge.Worker",
                             snapshotDirectory.toString())
                     .redirectError(ProcessBuilder.Redirect.appendTo(errorLog.toFile()))
                     .start();

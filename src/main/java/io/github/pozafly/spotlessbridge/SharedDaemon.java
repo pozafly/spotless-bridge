@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.net.*;
@@ -18,7 +18,7 @@ public final class SharedDaemon {
     private static final String PROTOCOL = "2";
 
     public static Path state(Path root) throws IOException {
-        Path state = root.toRealPath().resolve(".gradle/spotless-daemon");
+        Path state = root.toRealPath().resolve(".gradle/spotless-bridge");
         Files.createDirectories(state.resolve("snapshots"));
         try {
             Files.setPosixFilePermissions(state, PosixFilePermissions.fromString("rwx------"));
@@ -40,7 +40,7 @@ public final class SharedDaemon {
         Path temp = Files.createTempFile(path.getParent(), "state-", ".tmp");
         try {
             try (OutputStream out = Files.newOutputStream(temp)) {
-                properties.store(out, "Spotless Daemon");
+                properties.store(out, "Spotless Bridge");
             }
             Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } finally {
@@ -49,10 +49,10 @@ public final class SharedDaemon {
     }
 
     public static Properties endpoint(Path root) throws IOException {
-        Properties endpoint = read(root.toRealPath().resolve(".gradle/spotless-daemon/endpoint.properties"));
+        Properties endpoint = read(root.toRealPath().resolve(".gradle/spotless-bridge/endpoint.properties"));
         if (!PROTOCOL.equals(endpoint.getProperty("protocol"))
                 || !root.toRealPath().toString().equals(endpoint.getProperty("root")))
-            throw new IOException("Incompatible project daemon endpoint; run spotlessDaemonStart");
+            throw new IOException("Incompatible project daemon endpoint; run spotlessBridgeStart");
         return endpoint;
     }
 
@@ -117,7 +117,7 @@ public final class SharedDaemon {
                                 launch.toString(),
                                 snapshot.toString(),
                                 key,
-                                System.getProperty("spotlessDaemon.idleSeconds", "1800"))
+                                System.getProperty("spotlessBridge.idleSeconds", "1800"))
                         .directory(root.toFile())
                         .redirectInput(ProcessBuilder.Redirect.from(new File(windows() ? "NUL" : "/dev/null")))
                         .redirectErrorStream(true)

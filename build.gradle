@@ -3,16 +3,16 @@ gradlePlugin {
     website = 'https://github.com/pozafly/java-formatter-server'
     vcsUrl = 'https://github.com/pozafly/java-formatter-server.git'
     plugins {
-        spotlessDaemon {
-            id = 'io.github.pozafly.spotlessdaemon'
-            implementationClass = 'io.github.pozafly.spotlessdaemon.SpotlessDaemonPlugin'
-            displayName = 'Spotless Daemon'
+        spotlessBridge {
+            id = 'io.github.pozafly.spotlessbridge'
+            implementationClass = 'io.github.pozafly.spotlessbridge.SpotlessBridgePlugin'
+            displayName = 'Spotless Bridge'
             tags.addAll('spotless', 'formatter', 'java', 'daemon')
             description = 'Project-owned Spotless Java daemon shared by editors and automation'
         }
     }
 }
-publishing { repositories { maven { name = 'test'; url = providers.gradleProperty('spotlessDaemonRepository').orElse(layout.buildDirectory.dir('repository').map { it.asFile.absolutePath }) } } }
+publishing { repositories { maven { name = 'test'; url = providers.gradleProperty('spotlessBridgeRepository').orElse(layout.buildDirectory.dir('repository').map { it.asFile.absolutePath }) } } }
 
 repositories { mavenCentral() }
 java { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
@@ -41,22 +41,22 @@ tasks.register('engineDist', Sync) {
 }
 tasks.register('ideaJar', Jar) {
     dependsOn ideaClasses, classes
-    archiveBaseName = 'spotless-daemon-idea'
+    archiveBaseName = 'spotless-bridge-idea'
     from sourceSets.idea.output
-    from(sourceSets.main.output) { include 'io/github/pozafly/spotlessdaemon/WorkerClient*.class', 'io/github/pozafly/spotlessdaemon/GradleFormatter*.class', 'io/github/pozafly/spotlessdaemon/SharedDaemon*.class' }
+    from(sourceSets.main.output) { include 'io/github/pozafly/spotlessbridge/WorkerClient*.class', 'io/github/pozafly/spotlessbridge/GradleFormatter*.class', 'io/github/pozafly/spotlessbridge/SharedDaemon*.class' }
 }
 tasks.register('pluginZip', Zip) {
     dependsOn ideaJar
-    archiveFileName = "spotless-daemon-${version}.zip"
+    archiveFileName = "spotless-bridge-${version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
-    into('spotless-daemon') {
+    into('spotless-bridge') {
         from(tasks.ideaJar) { into 'lib' }
     }
 }
 tasks.register('selfTest', JavaExec) {
     dependsOn testClasses, engineDist, publishAllPublicationsToTestRepository
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'io.github.pozafly.spotlessdaemon.FormatterSelfTest'
+    mainClass = 'io.github.pozafly.spotlessbridge.FormatterSelfTest'
     args layout.buildDirectory.dir('engine').get().asFile.absolutePath, layout.buildDirectory.dir('repository').get().asFile.absolutePath
     workingDir rootDir
 }

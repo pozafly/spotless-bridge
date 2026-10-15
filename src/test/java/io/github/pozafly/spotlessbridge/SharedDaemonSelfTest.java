@@ -1,4 +1,4 @@
-package io.github.pozafly.spotlessdaemon;
+package io.github.pozafly.spotlessbridge;
 
 import java.io.*;
 import java.net.*;
@@ -17,7 +17,7 @@ public final class SharedDaemonSelfTest {
         Files.writeString(included.resolve("build.gradle"), "// external configuration\n");
         Path settings = root.resolve("settings.gradle");
         Files.writeString(settings, Files.readString(settings) + "\nincludeBuild '../included-build'\n");
-        gradle(root, "spotlessDaemonStart");
+        gradle(root, "spotlessBridgeStart");
         String expected;
         long pid = SharedDaemon.status(root);
         try (GradleFormatter editor = new GradleFormatter(root, javaHome, List.of(), () -> {})) {
@@ -46,7 +46,7 @@ public final class SharedDaemonSelfTest {
         Files.writeString(
                 buildScript,
                 Files.readString(buildScript) + "\nnew File(rootDir, 'gradle-calls.txt').append('called\\n')\n");
-        gradle(root, "spotlessDaemonStart");
+        gradle(root, "spotlessBridgeStart");
         worker = SharedDaemon.workerPid(root);
         // Refresh replaced the worker; materialize it before checking reuse.
         SharedDaemon.format(SharedDaemon.endpoint(root), file, source);
@@ -124,7 +124,7 @@ public final class SharedDaemonSelfTest {
         try {
             Files.writeString(build, previous + "\nspotless { encoding 'UTF-16LE'; lineEndings 'WINDOWS' }\n");
             Files.write(file, source.getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
-            gradle(root, "spotlessDaemonApply", "-PspotlessDaemonFiles=" + list);
+            gradle(root, "spotlessBridgeApply", "-PspotlessBridgeFiles=" + list);
             byte[] actual = Files.readAllBytes(file);
             String text = new String(actual, java.nio.charset.StandardCharsets.UTF_16LE);
             check(text.contains("\r\n") && !text.replace("\r\n", "").contains("\n"), "disk CRLF preserved");
@@ -141,11 +141,11 @@ public final class SharedDaemonSelfTest {
         ExecutorService starters = Executors.newFixedThreadPool(2);
         try {
             Future<?> first = starters.submit(() -> {
-                gradle(root, "spotlessDaemonStart");
+                gradle(root, "spotlessBridgeStart");
                 return null;
             });
             Future<?> second = starters.submit(() -> {
-                gradle(root, "spotlessDaemonStart");
+                gradle(root, "spotlessBridgeStart");
                 return null;
             });
             first.get(120, TimeUnit.SECONDS);
@@ -155,7 +155,7 @@ public final class SharedDaemonSelfTest {
         }
         check(SharedDaemon.status(root) > 0, "concurrent startup ready");
         SharedDaemon.stop(root);
-        gradle(root, "spotlessDaemonStart", "-DspotlessDaemon.idleSeconds=2");
+        gradle(root, "spotlessBridgeStart", "-DspotlessBridge.idleSeconds=2");
         long idlePid = SharedDaemon.status(root);
         ProcessHandle.of(idlePid).orElseThrow().onExit().get(10, TimeUnit.SECONDS);
         check(SharedDaemon.status(root) == -1, "idle exit removes endpoint");

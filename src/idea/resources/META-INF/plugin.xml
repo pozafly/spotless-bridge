@@ -1,21 +1,21 @@
 <idea-plugin>
-    <id>io.github.pozafly.spotlessdaemon</id>
-    <name>Spotless Daemon</name>
+    <id>io.github.pozafly.spotlessbridge</id>
+    <name>Spotless Bridge</name>
     <version>${version}</version>
     <vendor>pozafly</vendor>
     <description><![CDATA[
         Persistent formatter using the project's evaluated spotless { java { ... } } configuration.
-        Enable per project under Settings > Tools > Spotless Daemon.
+        Enable per project under Settings > Tools > Spotless Bridge.
         Automatically reloads saved build configuration on the next format request. Reuses the worker while configuration is unchanged.
     ]]></description>
     <idea-version since-build="262.10968" until-build="262.*"/>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <extensions defaultExtensionNs="com.intellij">
-        <formattingService implementation="io.github.pozafly.spotlessdaemon.idea.JavaFormattingService" order="first"/>
-        <projectConfigurable parentId="tools" id="io.github.pozafly.spotlessdaemon.settings"
-                             displayName="Spotless Daemon"
-                             instance="io.github.pozafly.spotlessdaemon.idea.FormatterSettingsPage"/>
-        <notificationGroup id="Spotless Daemon" displayType="BALLOON"/>
+        <formattingService implementation="io.github.pozafly.spotlessbridge.idea.JavaFormattingService" order="first"/>
+        <projectConfigurable parentId="tools" id="io.github.pozafly.spotlessbridge.settings"
+                             displayName="Spotless Bridge"
+                             instance="io.github.pozafly.spotlessbridge.idea.FormatterSettingsPage"/>
+        <notificationGroup id="Spotless Bridge" displayType="BALLOON"/>
     </extensions>
 </idea-plugin>
