@@ -1,4 +1,4 @@
-package dev.local.javaformatter;
+package io.github.pozafly.spotlessdaemon;
 
 import java.nio.file.*;
 import java.util.*;
@@ -6,9 +6,9 @@ import java.util.*;
 /** Optional full request-path measurement against copies and previously captured Gradle outputs. */
 public final class DynamicBenchmark {
     public static void main(String[] args) throws Exception {
-        Path root = Path.of(args[0]), engine = Path.of(args[1]), cache = Path.of(args[2]);
-        try (GradleFormatter formatter = new GradleFormatter(
-                root, Path.of(System.getProperty("java.home")), engine, cache, List.of(), () -> {})) {
+        Path root = Path.of(args[0]);
+        try (GradleFormatter formatter =
+                new GradleFormatter(root, Path.of(System.getProperty("java.home")), List.of(), () -> {})) {
             long first = System.nanoTime();
             List<List<Double>> timings = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
             long firstMs = 0;
@@ -34,6 +34,8 @@ public final class DynamicBenchmark {
             }
             System.out.println(
                     "PASS: 42 results match reference Gradle outputs; full request path including file change detection");
+        } finally {
+            SharedDaemon.stop(root);
         }
     }
 }

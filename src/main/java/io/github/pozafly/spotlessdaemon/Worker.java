@@ -1,4 +1,4 @@
-package dev.local.javaformatter;
+package io.github.pozafly.spotlessdaemon;
 
 import java.io.*;
 import java.lang.reflect.*;
@@ -14,11 +14,18 @@ public final class Worker {
     private static final int MAX_BYTES = 16 * 1024 * 1024;
 
     public static void main(String[] args) throws Exception {
+        // An abruptly killed daemon cannot run close(); its worker must not remain orphaned.
+        ProcessHandle.current()
+                .parent()
+                .ifPresent(parent ->
+                        parent.onExit().thenRun(() -> Runtime.getRuntime().halt(0)));
         Path snapshot = Path.of(args[0]);
         Properties metadata = new Properties();
         try (InputStream in = Files.newInputStream(snapshot.resolve("snapshot.properties"))) {
             metadata.load(in);
         }
+        if (!"1".equals(metadata.getProperty("protocol")))
+            throw new IOException("Unsupported Spotless Daemon snapshot");
         List<LoadedFormatter> formatters = new ArrayList<>();
         try {
             for (int i = 0; i < Integer.parseInt(metadata.getProperty("formatters")); i++) {
@@ -26,7 +33,7 @@ public final class Worker {
             }
             DataInputStream input = new DataInputStream(new BufferedInputStream(System.in));
             DataOutputStream output = new DataOutputStream(new BufferedOutputStream(System.out));
-            output.writeInt(0x4A534632); // JSF2: source path + UTF-8 document buffer
+            output.writeInt(0x534C4431); // SLD1: source path + UTF-8 document buffer
             output.flush();
             while (true) {
                 int size;
@@ -46,11 +53,7 @@ public final class Worker {
                         for (String id : selected.split(","))
                             text = formatters.get(Integer.parseInt(id)).format(path, text);
                     }
-                    // IntelliJ Document requires LF; its file manager preserves the actual disk line endings/encoding.
-                    respond(
-                            output,
-                            0,
-                            text.replace("\r\n", "\n").replace('\r', '\n').getBytes(StandardCharsets.UTF_8));
+                    respond(output, 0, text.getBytes(StandardCharsets.UTF_8));
                 } catch (Exception failure) {
                     Throwable cause = failure;
                     while (cause instanceof InvocationTargetException && cause.getCause() != null)

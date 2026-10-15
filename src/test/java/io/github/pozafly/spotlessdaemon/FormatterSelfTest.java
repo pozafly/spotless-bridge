@@ -1,4 +1,4 @@
-package dev.local.javaformatter;
+package io.github.pozafly.spotlessdaemon;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -11,11 +11,16 @@ public final class FormatterSelfTest {
     private static final String SOURCE =
             "import java.util.Set;\n// TOKEN\nclass Sample{java.util.List<String> names;String label=\"안녕하세요 😀\";}\n";
 
+    private static String pluginRepositories;
+
     public static void main(String[] args) throws Exception {
         Path engine = Path.of(args[0]);
-        Path temp = Files.createTempDirectory("dynamic-spotless-test-");
+        pluginRepositories = "pluginManagement { repositories { maven { url = uri('"
+                + Path.of(args[1]).toUri() + "') }; gradlePluginPortal() } }\n";
+        String version = "8.10.2";
+        Path temp = Files.createTempDirectory("spotless-daemon-test-");
         Path root = temp.resolve("fixture");
-        Path cache = temp.resolve("cache");
+        Path cache = root.resolve(".gradle/spotless-daemon/snapshots");
         Path file = root.resolve("src/main/java/Sample.java");
         Files.createDirectories(file.getParent());
         Files.writeString(file, SOURCE);
@@ -25,11 +30,13 @@ public final class FormatterSelfTest {
         Files.createDirectories(wrapper);
         for (String name : List.of("gradle-wrapper.jar", "gradle-wrapper.properties"))
             Files.copy(Path.of("gradle/wrapper", name), wrapper.resolve(name));
+        Files.copy(Path.of("gradlew"), root.resolve("gradlew"));
+        root.resolve("gradlew").toFile().setExecutable(true);
         Path settings = root.resolve("settings.gradle");
-        Files.writeString(settings, "rootProject.name = 'formatter-test'\n");
+        Files.writeString(settings, pluginRepositories + "rootProject.name = 'formatter-test'\n");
         Path build = root.resolve("build.gradle");
         String initial = """
-                plugins { id 'java'; id 'com.diffplug.spotless' version '8.10.2' }
+                plugins { id 'java'; id 'com.diffplug.spotless' version '%s'; id 'io.github.pozafly.spotlessdaemon' version '0.5.0' }
                 repositories { mavenCentral() }
                 spotless { java {
                     target 'src/**/*.java'
@@ -39,7 +46,7 @@ public final class FormatterSelfTest {
                     palantirJavaFormat(providers.gradleProperty('palantirVersion').getOrElse('2.97.0'))
                 } }
                 apply from: 'format.gradle'
-                """;
+                """.formatted(version);
         Files.writeString(build, initial);
         Path script = root.resolve("format.gradle");
         Files.writeString(
@@ -53,11 +60,10 @@ public final class FormatterSelfTest {
         try (GradleFormatter formatter = new GradleFormatter(
                 root,
                 javaHome,
-                engine,
-                cache,
                 List.of(extra),
-                () -> System.out.println("Importing fixture Spotless configuration..."))) {
+                () -> System.out.println("Importing fixture Spotless Daemon configuration..."))) {
             String formatted = formatter.format(file, SOURCE);
+            checkGolden("palantir", formatted);
             check(formatted.contains("import java.util.List;"), "initial shortening");
             check(!formatted.contains("import java.util.Set;"), "initial unused imports");
             check(formatted.contains("FIRST"), "evaluated property and applied script");
@@ -75,6 +81,10 @@ public final class FormatterSelfTest {
             }
             ProcessSelfTest.main(new String[] {engine.toString(), snapshot.toString(), file.toString()});
             System.out.println("PASS: initial configuration, exact Gradle parity, warm reuse, process lifecycle");
+            check(
+                    Files.readString(snapshot.resolve("formatter-0/classpath.txt"))
+                            .contains("spotless-plugin-gradle-" + version + ".jar"),
+                    "project Spotless JAR used");
 
             Files.writeString(build, initial.replace("shortenFullyQualifiedTypes()", ""));
             String noShortening = formatter.format(file, SOURCE);
@@ -91,7 +101,7 @@ public final class FormatterSelfTest {
                     formatter.format(file, SOURCE).contains("SCRIPT") && formatter.importCount() == imported + 1,
                     "applied Gradle script change");
             imported = formatter.importCount();
-            Files.writeString(settings, "rootProject.name = 'formatter-renamed'\n");
+            Files.writeString(settings, pluginRepositories + "rootProject.name = 'formatter-renamed'\n");
             formatter.format(file, SOURCE);
             check(formatter.importCount() == imported + 1, "settings.gradle change");
             imported = formatter.importCount();
@@ -124,7 +134,8 @@ public final class FormatterSelfTest {
             imported = formatter.importCount();
             long createdPid = formatter.workerPid();
             check(formatter.format(pending, SOURCE).equals(createdOutput), "created target remains formatted");
-            check(formatter.importCount() == imported && formatter.workerPid() == createdPid,
+            check(
+                    formatter.importCount() == imported && formatter.workerPid() == createdPid,
                     "created target reuses refreshed worker");
             check(Files.readString(pending).equals(SOURCE), "new target source is not written by engine");
             System.out.println("PASS: missing path, later creation, Gradle parity and refreshed worker reuse");
@@ -145,9 +156,36 @@ public final class FormatterSelfTest {
                     formatter.format(file, SOURCE).equals(gradleOutput(root, file, SOURCE)),
                     "formatter version change and Gradle parity");
             System.out.println("PASS: Palantir 2.97.0 -> 2.96.0 resolved from project configuration");
+            String google = initial.replace(
+                    "palantirJavaFormat(providers.gradleProperty('palantirVersion').getOrElse('2.97.0'))",
+                    "googleJavaFormat('1.30.0')");
+            Files.writeString(build, google);
+            String googleResult = formatter.format(file, SOURCE);
+            checkGolden("google", googleResult);
+            check(googleResult.contains("\n  List<String> names;"), "Google style selected from DSL");
+            check(googleResult.equals(gradleOutput(root, file, SOURCE)), "Google Gradle parity");
+            check(!googleResult.equals(formatted.replace("FIRST", "SCRIPT")), "formatter selection changes output");
+            String eclipse = initial.replace(
+                    "palantirJavaFormat(providers.gradleProperty('palantirVersion').getOrElse('2.97.0'))", "eclipse()");
+            Files.writeString(build, eclipse);
+            check(formatter.format(file, SOURCE).equals(gradleOutput(root, file, SOURCE)), "Eclipse Gradle parity");
+            Files.writeString(build, initial);
+            System.out.println(
+                    "PASS: Palantir, Google and Eclipse selected by project DSL without an engine whitelist");
+
+            // Native Spotless tasks must check without writes, and apply exactly the worker's rules.
+            String expectedApplied = formatter.format(file, SOURCE);
+            check(runGradle(root, "spotlessCheck") != 0, "check must reject unformatted source");
+            check(Files.readString(file).equals(SOURCE), "check must not write source");
+            check(runGradle(root, "spotlessApply") == 0, "apply task");
+            check(Files.readString(file).equals(expectedApplied), "apply and worker parity");
+            check(runGradle(root, "spotlessCheck") == 0, "check after apply");
+            Files.writeString(file, SOURCE);
+            System.out.println("PASS: spotlessApply / spotlessCheck native tasks and source preservation");
+
             Path sub = root.resolve("child");
             Files.createDirectories(sub.resolve("src/main/java"));
-            Files.writeString(settings, "rootProject.name = 'formatter-test'\ninclude 'child'\n");
+            Files.writeString(settings, pluginRepositories + "rootProject.name = 'formatter-test'\ninclude 'child'\n");
             Files.writeString(
                     sub.resolve("build.gradle"),
                     "plugins { id 'java'; id 'com.diffplug.spotless' }\nspotless { java { target 'src/**/*.java'; replace('child-marker', 'TOKEN', 'CHILD') } }\n");
@@ -158,7 +196,11 @@ public final class FormatterSelfTest {
                     childOutput.contains("CHILD") && childOutput.contains("java.util.List<String>"),
                     "subproject selects its own evaluated rules");
             check(formatter.format(file, SOURCE).contains("SCRIPT"), "root still uses root rules");
-            System.out.println("PASS: multi-project rule routing");
+            String childBuild = Files.readString(sub.resolve("build.gradle"));
+            Files.writeString(sub.resolve("build.gradle"), childBuild.replace("; id 'com.diffplug.spotless'", ""));
+            Files.writeString(build, initial + "\nsubprojects { apply plugin: 'com.diffplug.spotless' }\n");
+            check(formatter.format(subFile, SOURCE).equals(childOutput), "Spotless applied by parent build");
+            System.out.println("PASS: multi-project rules and indirect Spotless application");
             Files.writeString(build, initial + "\nspotless { encoding 'ISO-8859-1' }\n");
             try {
                 formatter.format(file, SOURCE);
@@ -166,9 +208,130 @@ public final class FormatterSelfTest {
             } catch (WorkerClient.SourceException expected) {
             }
             System.out.println("PASS: project encoding honored; unencodable text rejected without data loss");
+            Files.writeString(settings, pluginRepositories + "rootProject.name = 'formatter-test'\n");
+            Files.writeString(build, "plugins { id 'java' }\n");
+            try {
+                formatter.format(file, SOURCE);
+                throw new AssertionError("project without Spotless must fail");
+            } catch (IOException expected) {
+                check(expected.getMessage().contains("설정"), "missing Spotless diagnostic");
+            }
+            Files.writeString(build, "plugins { id 'java'; id 'com.diffplug.spotless' version '" + version + "' }\n");
+            try {
+                formatter.format(file, SOURCE);
+                throw new AssertionError("Spotless without Java configuration must fail");
+            } catch (IOException expected) {
+                check(expected.getMessage().contains("설정"), "missing Java configuration diagnostic");
+            }
+            Files.writeString(build, initial + "\nspotless { ratchetFrom 'HEAD' }\n");
+            try {
+                formatter.format(file, SOURCE);
+                throw new AssertionError("ratchet configuration must fail");
+            } catch (IOException expected) {
+            }
+            Files.writeString(build, initial);
+            check(formatter.format(file, SOURCE).contains("import java.util.List;"), "repair after unsupported config");
+            System.out.println("PASS: missing Spotless, unsupported configuration and repair");
             check(Files.readString(file).equals(SOURCE), "source remains untouched");
+
+            // Spotless 8.0.0 predates shortenFullyQualifiedTypes; use its supported project rules.
+            // Changing the project version must replace the worker and match that version's Gradle output.
+            long previousPid = formatter.workerPid();
+            int previousImports = formatter.importCount();
+            Files.writeString(build, initial.replace(version, "8.0.0").replace("shortenFullyQualifiedTypes()", ""));
+            String older = formatter.format(file, SOURCE);
+            check(older.equals(gradleOutput(root, file, SOURCE)), "Spotless 8.0.0 Gradle parity");
+            check(
+                    formatter.workerPid() != previousPid && formatter.importCount() == previousImports + 1,
+                    "Spotless version change replaces worker");
+            try (var folders = Files.list(cache)) {
+                check(
+                        folders.anyMatch(folder -> {
+                            try {
+                                return Files.readString(folder.resolve("formatter-0/classpath.txt"))
+                                        .contains("spotless-plugin-gradle-8.0.0.jar");
+                            } catch (IOException ignored) {
+                                return false;
+                            }
+                        }),
+                        "older Spotless JAR exported from project");
+            }
+            Files.writeString(build, initial);
+            check(
+                    formatter.format(file, SOURCE).equals(gradleOutput(root, file, SOURCE)),
+                    "restore original Spotless version");
+            System.out.println(
+                    "PASS: project Spotless 8.10.2 -> 8.0.0 -> 8.10.2, Gradle parity and worker replacement");
+            kotlinDsl(temp, version, engine, javaHome);
+            SharedDaemonSelfTest.run(root, file, SOURCE);
             System.out.println("ALL TESTS PASSED; fixture=" + temp);
+        } finally {
+            SharedDaemon.stop(root);
         }
+    }
+
+    private static void kotlinDsl(Path temp, String version, Path engine, Path javaHome) throws Exception {
+        Path root = temp.resolve("kotlin-dsl");
+        Path file = root.resolve("src/main/java/KotlinDsl.java");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, SOURCE);
+        Files.createDirectories(root.resolve("gradle/wrapper"));
+        for (String name : List.of("gradle-wrapper.jar", "gradle-wrapper.properties"))
+            Files.copy(
+                    Path.of("gradle/wrapper", name),
+                    root.resolve("gradle/wrapper").resolve(name));
+        Files.writeString(
+                root.resolve("settings.gradle.kts"),
+                pluginRepositories.replace("uri('", "uri(\"").replace("')", "\")")
+                        + "rootProject.name = \"spotless-daemon-kotlin-test\"\n");
+        Files.writeString(root.resolve("build.gradle.kts"), """
+                plugins {
+                    java
+                    id("io.github.pozafly.spotlessdaemon") version "0.5.0"
+                    id("com.diffplug.spotless") version "%s"
+                }
+                repositories { mavenCentral() }
+                spotless {
+                    java {
+                        shortenFullyQualifiedTypes()
+                        removeUnusedImports()
+                        googleJavaFormat("1.30.0")
+                    }
+                }
+                """.formatted(version));
+        try (GradleFormatter formatter = new GradleFormatter(root, javaHome, List.of(), () -> {})) {
+            String result = formatter.format(file, SOURCE);
+            check(
+                    SharedDaemon.status(root) != SharedDaemon.status(temp.resolve("fixture")),
+                    "different projects use different daemons");
+            check(result.contains("import java.util.List;"), "Kotlin DSL shortening");
+            check(result.contains("\n  List<String> names;"), "Kotlin DSL Google style");
+            check(result.equals(gradleOutput(root, file, SOURCE)), "Kotlin DSL Gradle parity");
+        }
+        SharedDaemon.stop(root);
+        System.out.println("PASS: build.gradle.kts native Spotless Kotlin DSL");
+    }
+
+    private static int runGradle(Path root, String task) throws Exception {
+        Path log = Files.createTempFile("spotless-daemon-task-", ".log");
+        Process process = new ProcessBuilder(
+                        Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                        "-classpath",
+                        root.resolve("gradle/wrapper/gradle-wrapper.jar").toString(),
+                        "org.gradle.wrapper.GradleWrapperMain",
+                        "--quiet",
+                        "--no-configuration-cache",
+                        task)
+                .directory(root.toFile())
+                .redirectErrorStream(true)
+                .redirectOutput(log.toFile())
+                .start();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new AssertionError("Gradle task timeout: " + log);
+        }
+        System.out.println("Task " + task + ": exit=" + process.exitValue() + " log=" + log);
+        return process.exitValue();
     }
 
     private static String gradleOutput(Path root, Path file, String input) throws Exception {
@@ -203,6 +366,15 @@ public final class FormatterSelfTest {
                         || Files.readString(err).contains("IS CLEAN"),
                 "Gradle reference did not process the target");
         return Files.readString(err).contains("IS DIRTY") ? Files.readString(out) : input;
+    }
+
+    private static void checkGolden(String name, String output) throws IOException {
+        try (InputStream input = FormatterSelfTest.class.getResourceAsStream("/" + name + ".expected")) {
+            check(input != null, "missing expected output: " + name);
+            check(
+                    output.equals(new String(input.readAllBytes(), StandardCharsets.UTF_8)),
+                    name + " output changed; review the dependency update before changing the expected output");
+        }
     }
 
     private static void check(boolean condition, String message) {

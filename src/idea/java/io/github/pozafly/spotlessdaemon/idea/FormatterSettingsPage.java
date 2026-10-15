@@ -1,4 +1,4 @@
-package dev.local.javaformatter.idea;
+package io.github.pozafly.spotlessdaemon.idea;
 
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.project.Project;
@@ -18,13 +18,13 @@ public final class FormatterSettingsPage implements Configurable {
 
     @Override
     public String getDisplayName() {
-        return "Java Save Formatter";
+        return "Spotless Daemon";
     }
 
     @Override
     public JComponent createComponent() {
         JPanel panel = new JPanel(new GridLayout(0, 1, 0, 8));
-        enabled = new JCheckBox("이 프로젝트에서 Java Save Formatter 사용");
+        enabled = new JCheckBox("이 프로젝트에서 Spotless Daemon 사용");
         javaHome = new JTextField();
         panel.add(enabled);
         panel.add(new JLabel("JDK 21 홈 경로 (비워두면 프로젝트 SDK 사용)"));
@@ -40,7 +40,7 @@ public final class FormatterSettingsPage implements Configurable {
                 event -> project.getService(ProjectEngine.class).stop());
         panel.add(reload);
         panel.add(new JLabel("저장 시 실행: Tools > Actions on Save > Reformat code (Java, Whole file)"));
-        panel.add(new JLabel("기존 Run spotless와 Palantir IDE 포매터를 끈 후 사용하세요."));
+        panel.add(new JLabel("기존 Formo, Java Save Formatter, Run spotless, 다른 Java 포매터는 끈 후 사용하세요."));
         JPanel container = new JPanel(new BorderLayout());
         container.add(panel, BorderLayout.NORTH);
         reset();

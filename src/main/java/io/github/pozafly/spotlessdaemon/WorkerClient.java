@@ -1,4 +1,4 @@
-package dev.local.javaformatter;
+package io.github.pozafly.spotlessdaemon;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +17,7 @@ public final class WorkerClient implements AutoCloseable {
     private final Duration timeout;
     private final AtomicReference<Session> active = new AtomicReference<>();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(task -> {
-        Thread thread = new Thread(task, "Java Save Formatter timeout");
+        Thread thread = new Thread(task, "Spotless Daemon timeout");
         thread.setDaemon(true);
         return thread;
     });
@@ -44,7 +44,7 @@ public final class WorkerClient implements AutoCloseable {
                             "-Xmx256m",
                             "-cp",
                             engineDirectory.resolve("lib/*").toString(),
-                            "dev.local.javaformatter.Worker",
+                            "io.github.pozafly.spotlessdaemon.Worker",
                             snapshotDirectory.toString())
                     .redirectError(ProcessBuilder.Redirect.appendTo(errorLog.toFile()))
                     .start();
@@ -72,7 +72,7 @@ public final class WorkerClient implements AutoCloseable {
         }
         try {
             if (!current.ready) {
-                if (current.input.readInt() != 0x4A534632) throw new IOException("Unsupported formatter protocol");
+                if (current.input.readInt() != 0x534C4431) throw new IOException("Unsupported formatter protocol");
                 current.ready = true;
             }
             current.output.writeInt(bytes.length);

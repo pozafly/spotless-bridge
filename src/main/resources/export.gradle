@@ -2,18 +2,19 @@
 // All Spotless classes are loaded from the project's plugin classloader, not from this tool.
 gradle.projectsEvaluated {
     def root = gradle.rootProject
-    root.tasks.register('__javaSaveFormatterExport') {
+    root.tasks.named('spotlessDaemonStart') {
         doLast {
-            def output = new File(System.getProperty('javaSaveFormatter.output'))
-            output.mkdirs()
+            def output = java.nio.file.Files.createTempDirectory(new File(root.projectDir, '.gradle/spotless-daemon/snapshots').toPath(), 'snapshot-').toFile()
+
             def metadata = new Properties()
             def targets = [:].withDefault { [] }
             int count = 0
             root.allprojects.sort { it.path }.each { project ->
-                def task = project.tasks.findByName('spotlessJava')
+                def task = project.plugins.hasPlugin('com.diffplug.spotless')
+                        ? project.tasks.findByName('spotlessJava') : null
                 if (task != null && task.enabled) {
                     if (task.hasProperty('ratchetFrom') && task.ratchetFrom) {
-                        throw new GradleException('Java Save Formatter does not yet support ratchetFrom. Use Gradle Spotless for this configuration.')
+                        throw new GradleException('Spotless Daemon does not yet support ratchetFrom. Use the project spotlessApply task for this configuration.')
                     }
                     def folder = new File(output, "formatter-${count}")
                     folder.mkdirs()
@@ -31,20 +32,23 @@ gradle.projectsEvaluated {
                         cl = cl.parent
                     }
                     new File(folder, 'classpath.txt').text = urls.collect { new File(it.toURI()).absolutePath }.unique().join(File.pathSeparator)
+                    metadata.setProperty("encoding.${count}", task.encoding)
                     metadata.setProperty("steps.${count}", formatter.steps.collect { it.name }.join(','))
                     metadata.setProperty("task.${count}", task.path)
                     task.target.files.findAll { it.isFile() }.each { targets[it.canonicalPath].add(count) }
                     count++
                 }
             }
-            if (count == 0) throw new GradleException('No enabled spotlessJava task found in this Gradle build.')
+            if (count == 0) throw new GradleException('No enabled Spotless Java formatter found. Apply com.diffplug.spotless and configure spotless { java { ... } } in the Java project.')
+            metadata.setProperty('protocol', '1')
             metadata.setProperty('formatters', count.toString())
             targets.each { path, ids -> metadata.setProperty('target.' + path, ids.join(',')) }
             def watched = ([root.projectDir] + root.allprojects.collect { it.projectDir } + gradle.includedBuilds.collect { it.projectDir }).collect { it.canonicalPath }.unique()
             metadata.setProperty('watch.count', watched.size().toString())
             watched.eachWithIndex { path, i -> metadata.setProperty("watch.${i}", path) }
             new File(output, 'snapshot.properties').withOutputStream { metadata.store(it, 'Evaluated Spotless Java configuration') }
-            println('Java Save Formatter: exported ' + count + ' Java formatter(s).')
+            installSnapshot.accept(output.toPath())
+
         }
     }
 }

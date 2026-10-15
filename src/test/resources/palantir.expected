@@ -1,0 +1,7 @@
+import java.util.List;
+// FIRST
+
+class Sample {
+    List<String> names;
+    String label = "안녕하세요 😀";
+}

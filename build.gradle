@@ -1,9 +1,22 @@
-plugins { id 'java' }
-group = 'dev.local'
-version = '0.2.0'
+plugins { id 'com.gradle.plugin-publish' version '2.2.1' }
+gradlePlugin {
+    website = 'https://github.com/pozafly/java-formatter-server'
+    vcsUrl = 'https://github.com/pozafly/java-formatter-server.git'
+    plugins {
+        spotlessDaemon {
+            id = 'io.github.pozafly.spotlessdaemon'
+            implementationClass = 'io.github.pozafly.spotlessdaemon.SpotlessDaemonPlugin'
+            displayName = 'Spotless Daemon'
+            tags.addAll('spotless', 'formatter', 'java', 'daemon')
+            description = 'Project-owned Spotless Java daemon shared by editors and automation'
+        }
+    }
+}
+publishing { repositories { maven { name = 'test'; url = providers.gradleProperty('spotlessDaemonRepository').orElse(layout.buildDirectory.dir('repository').map { it.asFile.absolutePath }) } } }
+
 repositories { mavenCentral() }
 java { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
-// Compile against an installed SDK without downloading or changing IntelliJ.
+// The IDE SDK is only needed for pluginZip, not for engine/Gradle tests or CI.
 def ideaHome = providers.gradleProperty('ideaHome').orElse('/Applications/IntelliJ IDEA.app/Contents')
 sourceSets {
     idea {
@@ -16,6 +29,10 @@ tasks.named('compileIdeaJava', JavaCompile) {
     options.release = 21
     options.compilerArgs += ['-proc:none']
 }
+tasks.named('processIdeaResources') {
+    inputs.property('version', project.version)
+    filesMatching('META-INF/plugin.xml') { expand(version: project.version) }
+}
 tasks.register('engineDist', Sync) {
     dependsOn jar
     into layout.buildDirectory.dir('engine')
@@ -24,23 +41,23 @@ tasks.register('engineDist', Sync) {
 }
 tasks.register('ideaJar', Jar) {
     dependsOn ideaClasses, classes
-    archiveBaseName = 'java-save-formatter-plugin'
+    archiveBaseName = 'spotless-daemon-idea'
     from sourceSets.idea.output
-    from(sourceSets.main.output) { include 'dev/local/javaformatter/WorkerClient*.class', 'dev/local/javaformatter/GradleFormatter*.class' }
+    from(sourceSets.main.output) { include 'io/github/pozafly/spotlessdaemon/WorkerClient*.class', 'io/github/pozafly/spotlessdaemon/GradleFormatter*.class', 'io/github/pozafly/spotlessdaemon/SharedDaemon*.class' }
 }
 tasks.register('pluginZip', Zip) {
-    dependsOn ideaJar, engineDist
-    archiveFileName = "java-save-formatter-${version}.zip"
+    dependsOn ideaJar
+    archiveFileName = "spotless-daemon-${version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
-    into('java-save-formatter') {
+    into('spotless-daemon') {
         from(tasks.ideaJar) { into 'lib' }
-        from(tasks.engineDist) { into 'engine' }
     }
 }
 tasks.register('selfTest', JavaExec) {
-    dependsOn testClasses, engineDist
+    dependsOn testClasses, engineDist, publishAllPublicationsToTestRepository
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'dev.local.javaformatter.FormatterSelfTest'
-    args layout.buildDirectory.dir('engine').get().asFile.absolutePath
+    mainClass = 'io.github.pozafly.spotlessdaemon.FormatterSelfTest'
+    args layout.buildDirectory.dir('engine').get().asFile.absolutePath, layout.buildDirectory.dir('repository').get().asFile.absolutePath
+    workingDir rootDir
 }
 tasks.named('check') { dependsOn 'selfTest' }

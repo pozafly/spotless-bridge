@@ -1,4 +1,4 @@
-package dev.local.javaformatter.idea;
+package io.github.pozafly.spotlessdaemon.idea;
 
 import com.intellij.formatting.service.*;
 import com.intellij.openapi.application.ReadAction;
@@ -34,12 +34,12 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
 
     @Override
     protected String getName() {
-        return "Java Save Formatter";
+        return "Spotless Daemon";
     }
 
     @Override
     protected String getNotificationGroupId() {
-        return "Java Save Formatter";
+        return "Spotless Daemon";
     }
 
     @Override

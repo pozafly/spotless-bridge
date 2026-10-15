@@ -1,21 +1,21 @@
 <idea-plugin>
-    <id>dev.local.java-save-formatter</id>
-    <name>Java Save Formatter</name>
-    <version>0.2.0</version>
-    <vendor>Local development tools</vendor>
+    <id>io.github.pozafly.spotlessdaemon</id>
+    <name>Spotless Daemon</name>
+    <version>${version}</version>
+    <vendor>pozafly</vendor>
     <description><![CDATA[
-        Persistent formatter using the project's evaluated Gradle Spotless Java configuration.
-        Enable per project under Settings > Tools > Java Save Formatter.
+        Persistent formatter using the project's evaluated spotless { java { ... } } configuration.
+        Enable per project under Settings > Tools > Spotless Daemon.
         Automatically reloads saved build configuration on the next format request. Reuses the worker while configuration is unchanged.
     ]]></description>
     <idea-version since-build="262.10968" until-build="262.*"/>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <extensions defaultExtensionNs="com.intellij">
-        <formattingService implementation="dev.local.javaformatter.idea.JavaFormattingService" order="first"/>
-        <projectConfigurable parentId="tools" id="dev.local.java-save-formatter.settings"
-                             displayName="Java Save Formatter"
-                             instance="dev.local.javaformatter.idea.FormatterSettingsPage"/>
-        <notificationGroup id="Java Save Formatter" displayType="BALLOON"/>
+        <formattingService implementation="io.github.pozafly.spotlessdaemon.idea.JavaFormattingService" order="first"/>
+        <projectConfigurable parentId="tools" id="io.github.pozafly.spotlessdaemon.settings"
+                             displayName="Spotless Daemon"
+                             instance="io.github.pozafly.spotlessdaemon.idea.FormatterSettingsPage"/>
+        <notificationGroup id="Spotless Daemon" displayType="BALLOON"/>
     </extensions>
 </idea-plugin>

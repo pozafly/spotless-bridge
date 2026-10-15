@@ -1,11 +1,10 @@
-package dev.local.javaformatter;
+package io.github.pozafly.spotlessdaemon;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.*;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -14,11 +13,10 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class GradleFormatter implements AutoCloseable {
     private static final Set<String> IGNORED =
             Set.of(".git", ".idea", ".gradle", "build", "out", "node_modules", ".venv");
-    private final Path root, javaHome, engineDirectory, cacheDirectory;
+    private final Path root, javaHome, cacheDirectory;
     private final List<Path> extraWatch;
     private final Runnable importing;
     private final AtomicReference<Process> exportProcess = new AtomicReference<>();
-    private volatile WorkerClient worker;
     private volatile boolean closed;
     private String fingerprint;
     private List<Path> watchedRoots;
@@ -26,55 +24,79 @@ public final class GradleFormatter implements AutoCloseable {
     private final Set<Path> excluded = new HashSet<>();
     private int imports;
 
-    public GradleFormatter(
-            Path root,
-            Path javaHome,
-            Path engineDirectory,
-            Path cacheDirectory,
-            List<Path> extraWatch,
-            Runnable importing)
-            throws IOException {
+    public GradleFormatter(Path root, Path javaHome, List<Path> extraWatch, Runnable importing) throws IOException {
         this.root = root.toRealPath();
         this.javaHome = javaHome;
-        this.engineDirectory = engineDirectory;
-        this.cacheDirectory = cacheDirectory;
+        this.cacheDirectory = SharedDaemon.state(this.root);
         this.extraWatch = List.copyOf(extraWatch);
         this.importing = importing;
         watchedRoots = List.of(this.root);
-        Files.createDirectories(cacheDirectory);
     }
 
     public synchronized String format(Path file, String source) throws IOException {
         if (closed) throw new IOException("Formatter is stopped");
         Path canonical = file.toFile().getCanonicalFile().toPath();
-        String current = fingerprint();
-        boolean unknown =
-                metadata == null || (!metadata.containsKey("target." + canonical) && !excluded.contains(canonical));
-        if (worker == null || !current.equals(fingerprint) || unknown) reload(current);
+        Properties endpoint = prepare(canonical);
         if (!metadata.containsKey("target." + canonical)) {
-            // Missing paths can become targets on their first save; do not cache them as exclusions.
+            // A path requested before its first save must not become a cached exclusion.
             if (Files.isRegularFile(canonical)) excluded.add(canonical);
             return source;
         }
-        WorkerClient selected = worker;
-        String formatted = selected.format(canonical, source);
-        // A build script may be saved while this request is running. Never return the old rules' result.
-        if (closed || selected != worker || !fingerprint.equals(fingerprint())) {
-            throw new IOException("Spotless 설정이 포맷 도중 변경되었습니다. 다시 저장하면 새 설정을 적용합니다.");
-        }
+        fingerprint = fingerprint();
+        String formatted = SharedDaemon.format(endpoint, canonical, source);
+        if (closed || (fingerprint != null && !fingerprint.equals(fingerprint())))
+            throw new IOException("Spotless 설정이 포맷 도중 변경되었습니다. 다시 저장하세요.");
         return formatted;
     }
 
+    private Properties prepare(Path canonical) throws IOException {
+        String current = fingerprint();
+        Properties endpoint = null;
+        try {
+            endpoint = SharedDaemon.endpoint(root);
+            Properties latest = SharedDaemon.metadata(endpoint);
+            watchedRoots = SharedDaemon.watchedRoots(latest);
+            if (metadata == null || !metadata.getProperty("fingerprint").equals(latest.getProperty("fingerprint")))
+                excluded.clear();
+            metadata = latest;
+            boolean unknown = !metadata.containsKey("target." + canonical) && !excluded.contains(canonical);
+            boolean changed = !metadata.getProperty("fingerprint").equals(fingerprint(root, watchedRoots, List.of()))
+                    || (fingerprint != null && !current.equals(fingerprint));
+            if (unknown || changed || SharedDaemon.status(root) < 0) endpoint = null;
+        } catch (IOException unavailable) {
+            endpoint = null;
+        }
+        if (endpoint == null) {
+            // Metadata may add external included builds to the watched roots. Compare the same scope before/after Gradle.
+            reload(fingerprint());
+            endpoint = SharedDaemon.endpoint(root);
+        }
+        return endpoint;
+    }
+
+    public synchronized void refresh() {
+        fingerprint = "";
+        excluded.clear();
+    }
+
+    /** Project-installed command-line client used by hooks; warm requests do not invoke Gradle. */
+    public static void main(String[] args) throws Exception {
+        Path root = Path.of(args[0]).toRealPath(), list = Path.of(args[1]);
+        try (GradleFormatter client =
+                new GradleFormatter(root, Path.of(System.getProperty("java.home")), List.of(), () -> {})) {
+            for (String path : Files.readAllLines(list, StandardCharsets.UTF_8)) {
+                if (!path.isBlank()) client.prepare(root.resolve(path).toRealPath());
+            }
+            SharedDaemon.apply(root, list);
+        }
+    }
+
     private void reload(String before) throws IOException {
-        WorkerClient previous = worker;
-        worker = null;
         fingerprint = null;
         metadata = null;
         excluded.clear();
-        if (previous != null) previous.close();
         importing.run();
-        Path output = Files.createTempDirectory(cacheDirectory, "snapshot-");
-        Path log = output.resolve("gradle-export.log");
+        Path log = Files.createTempFile(cacheDirectory, "gradle-start-", ".log");
         Path java = javaHome.resolve("bin").resolve(isWindows() ? "java.exe" : "java");
         Path wrapper = root.resolve("gradle/wrapper/gradle-wrapper.jar");
         if (!Files.isRegularFile(wrapper)) throw new IOException("Gradle wrapper JAR를 찾을 수 없습니다: " + wrapper);
@@ -86,10 +108,7 @@ public final class GradleFormatter implements AutoCloseable {
                         "--no-configuration-cache",
                         "--console=plain",
                         "--quiet",
-                        "-I",
-                        engineDirectory.resolve("export.gradle").toString(),
-                        "-DjavaSaveFormatter.output=" + output,
-                        ":__javaSaveFormatterExport")
+                        ":spotlessDaemonStart")
                 .directory(root.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(log.toFile());
@@ -103,42 +122,31 @@ public final class GradleFormatter implements AutoCloseable {
         try {
             if (!process.waitFor(120, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                throw new IOException("Spotless 설정을 120초 안에 가져오지 못했습니다. 로그: " + log);
+                throw new IOException("Spotless Daemon 설정을 120초 안에 가져오지 못했습니다. 로그: " + log);
             }
             if (process.exitValue() != 0)
-                throw new IOException("Spotless 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log);
+                throw new IOException("Spotless Daemon 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log);
         } catch (InterruptedException interrupted) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
-            throw new IOException("Spotless 설정 불러오기가 취소되었습니다.", interrupted);
+            throw new IOException("Spotless Daemon 설정 불러오기가 취소되었습니다.", interrupted);
         } finally {
             exportProcess.compareAndSet(process, null);
         }
         if (closed) throw new IOException("Formatter is stopped");
         if (!before.equals(fingerprint())) throw new IOException("설정을 가져오는 동안 빌드 파일이 변경되었습니다. 다시 저장하세요.");
-        Properties imported = new Properties();
-        try (InputStream in = Files.newInputStream(output.resolve("snapshot.properties"))) {
-            imported.load(in);
-        }
-        List<Path> roots = new ArrayList<>();
-        int count = Integer.parseInt(imported.getProperty("watch.count"));
-        for (int i = 0; i < count; i++) roots.add(Path.of(imported.getProperty("watch." + i)));
-        watchedRoots = roots;
-        String importedFingerprint = fingerprint();
-        WorkerClient next =
-                new WorkerClient(java, engineDirectory, output.resolve("worker.log"), output, Duration.ofSeconds(15));
-        worker = next;
-        if (closed) {
-            next.close();
-            worker = null;
-            throw new IOException("Formatter is stopped");
-        }
+        Properties imported = SharedDaemon.metadata(SharedDaemon.endpoint(root));
+        watchedRoots = SharedDaemon.watchedRoots(imported);
         metadata = imported;
-        fingerprint = importedFingerprint;
+        fingerprint = fingerprint();
         imports++;
     }
 
     private String fingerprint() throws IOException {
+        return fingerprint(root, watchedRoots, extraWatch);
+    }
+
+    public static String fingerprint(Path root, List<Path> watchedRoots, List<Path> extraWatch) throws IOException {
         SortedSet<Path> paths = new TreeSet<>();
         for (Path watched : watchedRoots) collect(watched, !watched.startsWith(root), paths);
         for (Path extra : extraWatch) collect(extra, true, paths);
@@ -208,8 +216,11 @@ public final class GradleFormatter implements AutoCloseable {
     }
 
     public long workerPid() {
-        WorkerClient current = worker;
-        return current == null ? -1 : current.pid();
+        try {
+            return SharedDaemon.workerPid(root);
+        } catch (IOException stopped) {
+            return -1;
+        }
     }
 
     private static boolean isWindows() {
@@ -221,7 +232,6 @@ public final class GradleFormatter implements AutoCloseable {
         closed = true;
         Process process = exportProcess.getAndSet(null);
         if (process != null) process.destroyForcibly();
-        WorkerClient current = worker;
-        if (current != null) current.close();
+        // The project daemon belongs to all clients; closing an editor must not stop it.
     }
 }

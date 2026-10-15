@@ -1,10 +1,10 @@
-package dev.local.javaformatter.idea;
+package io.github.pozafly.spotlessdaemon.idea;
 
 import com.intellij.openapi.components.*;
 import org.jetbrains.annotations.NotNull;
 
 @Service(Service.Level.PROJECT)
-@State(name = "LocalJavaSaveFormatter", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
+@State(name = "SpotlessDaemonSettings", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
 public final class FormatterSettings implements PersistentStateComponent<FormatterSettings.Values> {
     public static final class Values {
         public boolean enabled;
