@@ -119,6 +119,7 @@ daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다�
   JDK 21·25에서 **1.30.0**을 사용합니다. 1.30.0은 JDK 21 이상이 필요하며, Bridge는 프로젝트가 선택한 버전을
   자동으로 낮추지 않고 호환 오류를 전달합니다. Palantir 2.97.0·2.96.0과 테스트의 Eclipse 설정도 검사합니다.
 - Bridge는 **Gradle 프로젝트의 Java 파일을 전체 파일 단위로** 포맷합니다. Maven 지원은 준비 중이며, 다른 언어는 지원하지 않습니다.
+- CI는 Linux와 macOS에서 검증합니다. Windows 런처도 포함되어 있지만 아직 검증하지 않았습니다.
 - Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, 직렬화할 수 없는 포맷 단계는 지원하지 않습니다.
   빌드에서 configuration cache를 켜 두었다면 Bridge 태스크는 `--no-configuration-cache`로 실행하세요.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.

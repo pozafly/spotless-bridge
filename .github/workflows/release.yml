@@ -1,0 +1,52 @@
+name: Release to Gradle Plugin Portal
+# Pushing a v<version> tag verifies the build and publishes the Gradle plugin.
+# Run manually to validate the Portal metadata and credentials without publishing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to the Plugin Portal (otherwise only --validate-only)"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Check that the tag matches the project version
+        if: github.event_name == 'push'
+        run: |
+          version=$(sed -n 's/^version=//p' gradle.properties)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version=$version in gradle.properties" >&2
+            exit 1
+          fi
+      - name: Verify
+        run: ./gradlew --no-daemon --console=plain check engineDist
+      - name: Publish
+        env:
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+          PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+        run: |
+          if [ -z "$GRADLE_PUBLISH_KEY" ] || [ -z "$GRADLE_PUBLISH_SECRET" ]; then
+            echo "Set the GRADLE_PUBLISH_KEY and GRADLE_PUBLISH_SECRET repository secrets first." >&2
+            exit 1
+          fi
+          if [ "$PUBLISH" = "true" ]; then
+            ./gradlew --no-daemon --console=plain publishPlugins
+          else
+            ./gradlew --no-daemon --console=plain publishPlugins --validate-only
+          fi

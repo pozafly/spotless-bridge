@@ -100,6 +100,10 @@ JDK 17에서 1.30.0을 지정하면 실패하며 파일을 보존하는지, 1.28
 CI는 SDK 없는 `check engineDist`를 실행합니다. 실제 IntelliJ UI 저장 동작·Plugin Verifier·
 Marketplace 승인과 별개입니다. SDK는 `pluginZip`에만 필요합니다.
 
+`verify.yml`은 Ubuntu 조합에 더해 macOS에서 Gradle 8.14.3·JDK 17과 Gradle 9.8.1·JDK 21을 실행합니다. Windows는 아직 CI가 없습니다.
+`spotless-latest.yml`은 매주 월요일 Plugin Portal의 최신 Spotless 버전을 찾아 `-PtestSpotlessVersion`으로 전체 검사를 실행합니다.
+이 job이 실패하면 Spotless 내부 API 변경이나 허용 범위 밖 버전(예: 9.x)이 나온 것이므로 지원 범위와 구현을 점검하세요.
+
 ## 배포 준비
 
 `com.gradle.plugin-publish`로 구현 JAR, sources/javadoc, plugin marker와 Portal 메타데이터를 생성합니다.
@@ -117,8 +121,10 @@ hook 런처(`src/main/resources/spotless-bridge/spotless-bridge`, `.cmd`)는 `LI
 `<root> <list-file>` 호출 방식도 계속 지원합니다. Windows 런처는 CI에서 검증하지 않습니다.
 
 공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
-게시 자격 증명은 Git에 넣지 않습니다. API 키가 준비된 뒤 `publishPlugins --validate-only`로 확인하고,
-승인된 출시 작업에서 `publishPlugins`를 실행합니다. 두 옵션의 차이는
+게시 자격 증명은 Git에 넣지 않고 저장소 secret `GRADLE_PUBLISH_KEY`, `GRADLE_PUBLISH_SECRET`에 둡니다.
+`release.yml`은 `v<version>` 태그를 push하면 태그와 `gradle.properties`의 버전이 같은지 확인하고 `check engineDist`를 거쳐
+`publishPlugins`를 실행합니다. Actions에서 수동 실행하면 기본값으로 `publishPlugins --validate-only`만 수행합니다.
+태그를 push하기 전에 수동 실행으로 메타데이터와 자격 증명을 먼저 확인하세요. 두 옵션의 차이는
 [Gradle 공식 배포 문서](https://docs.gradle.org/current/userguide/publishing_gradle_plugins.html)를 참고하세요.
 이 저장소의 일반 build/check는 공개 게시를 수행하지 않습니다.
 

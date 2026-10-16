@@ -27,7 +27,7 @@ public final class FormatterSelfTest {
                 "Hook bootstrap JAVA_HOME must match the test runtime");
         System.out.println("Testing Bridge " + bridgeVersion + " with consumer Gradle " + gradleVersion
                 + " / JDK " + Runtime.version());
-        String version = "8.10.2";
+        String version = System.getProperty("spotlessBridge.testSpotlessVersion", "8.10.2");
         Path temp = Files.createTempDirectory("spotless-bridge-test-");
         Path root = temp.resolve("fixture");
         Path cache = root.resolve(".gradle/spotless-bridge/snapshots");
