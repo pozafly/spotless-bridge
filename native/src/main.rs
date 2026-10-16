@@ -309,6 +309,11 @@ fn bootstrap(root: &Path, state: &Path) -> Result<()> {
         .stdin(Stdio::null())
         .stderr(log.try_clone().map_err(|e| e.to_string())?)
         .stdout(log);
+    // Gradle 8.x cannot update a reused daemon's environment on Windows ARM64.
+    // Only preparation uses a fresh Gradle process; warm requests still bypass Gradle.
+    if cfg!(all(windows, target_arch = "aarch64")) {
+        command.arg("--no-daemon");
+    }
     if let Some(home) = home {
         command.env("JAVA_HOME", home);
     }

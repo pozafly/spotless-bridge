@@ -21,7 +21,7 @@ pushd "%BRIDGE_ROOT%" || exit /b 1
 rem Keep the wrapper path relative: Java on Windows can lose Unicode in absolute command-line paths.
 set "BRIDGE_BOOT_JAVA=java.exe"
 if defined JAVA_HOME set "BRIDGE_BOOT_JAVA=%JAVA_HOME%\bin\java.exe"
-"%BRIDGE_BOOT_JAVA%" -classpath "gradle\wrapper\gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain --console=plain --no-configuration-cache spotlessBridgeStart
+"%BRIDGE_BOOT_JAVA%" -classpath "gradle\wrapper\gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain --no-daemon --console=plain --no-configuration-cache spotlessBridgeStart
 if errorlevel 1 (
     popd
     exit /b 1
