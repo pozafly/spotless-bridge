@@ -10,6 +10,22 @@ You need a Spotless Bridge source checkout and **JDK 21**. The examples use thes
 - `/path/to/spotless-bridge`: your Spotless Bridge checkout
 - `/path/to/jdk21`: a JDK 21 installation
 
+## Native CLI build prerequisites (0.2.0 development)
+
+Install Rust via rustup before building from source. `native/rust-toolchain.toml` pins Rust 1.90.0;
+Cargo builds the host CLI automatically when Gradle processes resources. The native client has no external crates.
+This prerequisite applies only to Bridge contributors: users of a published plugin do not install Rust.
+Use version `0.2.0` in your consumer when testing this checkout's local repository.
+
+```sh
+./gradlew testNativeCli nativeSmokeTest
+```
+
+Source builds package the host executable only. To assemble a release from the six tested CI artifacts,
+place their platform directories under `build/native` and pass `-PnativeCliDirectory=build/native`.
+`publishPlugins` (including `--validate-only`) rejects packages missing any of the six clients.
+Do not run `clean` after downloading those build artifacts.
+
 ## 1. Publish the Gradle plugin to a local repository
 
 From the Spotless Bridge checkout:
@@ -57,7 +73,7 @@ Adapter bytecode is Java 21; the engine remains Java 17.
 The ZIP declares builds `253.28294.334` through `262.*` (2025.3–2026.2).
 
 In IntelliJ, open **Settings → Plugins → gear menu → Install Plugin from Disk…** and select
-`build/distributions/spotless-bridge-0.1.1.zip`. If you installed an earlier development build,
+`build/distributions/spotless-bridge-0.2.0.zip`. If you installed an earlier development build,
 disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea-preview).
 
 ### Verify the same ZIP across IDE versions without publishing
@@ -80,14 +96,14 @@ Plugin Verifier **1.410** against the first release and pinned latest patch of e
 | 2026.2 | `262.8665.258` |
 | 2026.2.3 | `262.10968.63` |
 
-On October 16, 2026, the same ZIP passed all six checks above. The 2025.3 builds reported `Compatible`;
+On October 16, 2026, the 0.1.1 ZIP passed all six checks above. The 2025.3 builds reported `Compatible`;
 the 2026.1 and 2026.2 builds reported `Compatible` with three deprecated API usages, explained below.
 
 To verify an already built ZIP against one pinned version without compiling it again:
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
-  -PideaPluginZip=/absolute/path/spotless-bridge-0.1.1.zip \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.0.zip \
   -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
 ```
 

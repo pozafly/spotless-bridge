@@ -10,6 +10,22 @@ Spotless Bridge 소스 디렉터리와 **JDK 21**이 필요합니다. 예시에�
 - `/path/to/spotless-bridge`: Spotless Bridge 소스 디렉터리
 - `/path/to/jdk21`: JDK 21 설치 경로
 
+## 네이티브 CLI 빌드 준비 (0.2.0 개발판)
+
+소스에서 빌드할 때는 rustup으로 Rust를 준비합니다. `native/rust-toolchain.toml`에 Rust 1.90.0이 고정되어 있고,
+Gradle 리소스 처리 시 Cargo가 현재 컴퓨터용 CLI를 빌드합니다. 외부 crate 의존성은 없습니다.
+이 요구사항은 Bridge 개발자에게만 해당합니다. 게시된 플러그인을 사용하는 사람은 Rust를 설치하지 않습니다.
+이 체크아웃의 로컬 저장소를 사용할 소비 프로젝트에서는 버전을 `0.2.0`으로 지정하세요.
+
+```sh
+./gradlew testNativeCli nativeSmokeTest
+```
+
+로컬 빌드에는 현재 OS·CPU 실행 파일만 포함됩니다. 정식 배포 때는 여섯 CI artifact의 플랫폼 폴더를
+`build/native` 아래에 모으고 `-PnativeCliDirectory=build/native`를 지정합니다.
+`publishPlugins`는 `--validate-only`에서도 여섯 실행 파일 중 하나라도 없으면 중단합니다.
+artifact를 받은 다음 `clean`으로 지우지 마세요.
+
 ## 1. Gradle 플러그인을 로컬 저장소에 게시
 
 Spotless Bridge 소스 디렉터리에서 실행합니다.
@@ -58,7 +74,7 @@ adapter 바이트코드는 Java 21, 엔진은 Java 17입니다.
 ZIP 설치 허용 범위는 `253.28294.334`부터 `262.*`까지로, 2025.3~2026.2를 대상으로 합니다.
 
 IntelliJ의 **Settings → Plugins → 톱니바퀴 → Install Plugin from Disk…**에서
-`build/distributions/spotless-bridge-0.1.1.zip`을 선택하세요. 이전 개발판이 있다면 먼저 비활성화하거나 제거합니다.
+`build/distributions/spotless-bridge-0.2.0.zip`을 선택하세요. 이전 개발판이 있다면 먼저 비활성화하거나 제거합니다.
 이후 [IntelliJ IDEA 설정](../README.ko.md#intellij-idea-미리보기)을 따릅니다.
 
 ### 게시 없이 동일 ZIP으로 여러 IDE 검증
@@ -81,14 +97,14 @@ JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-r
 | 2026.2 | `262.8665.258` |
 | 2026.2.3 | `262.10968.63` |
 
-2026년 10월 16일, 동일 ZIP으로 위 여섯 검사를 통과했습니다. 2025.3 계열은 `Compatible`,
+2026년 10월 16일, 0.1.1 ZIP으로 위 여섯 검사를 통과했습니다. 2025.3 계열은 `Compatible`,
 2026.1·2026.2 계열은 deprecated API 사용 3건을 포함한 `Compatible` 판정입니다. 경고의 이유는 아래에 설명합니다.
 
 이미 만든 ZIP을 재빌드 없이 특정 버전에서만 검증하려면 다음처럼 실행합니다.
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
-  -PideaPluginZip=/absolute/path/spotless-bridge-0.1.1.zip \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.0.zip \
   -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
 ```
 
