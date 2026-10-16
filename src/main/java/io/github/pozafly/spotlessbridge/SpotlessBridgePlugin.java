@@ -2,8 +2,11 @@ package io.github.pozafly.spotlessbridge;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.gradle.api.*;
@@ -37,7 +40,7 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
         // AI hooks run the launcher in .gradle, so any Gradle run (a build or an IDE sync) makes it available.
         writeLaunchers(project.getProjectDir().toPath());
         project.getTasks().register("spotlessBridgeStart", task -> {
-            task.setGroup("formatting");
+            task.setGroup(GROUP);
             task.setDescription("Export current Spotless settings and start or refresh the project daemon");
             task.notCompatibleWithConfigurationCache("Exports evaluated Spotless tasks");
             task.getExtensions().getExtraProperties().set("installSnapshot", (java.util.function.Consumer<Path>)
@@ -63,25 +66,37 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
         });
         project.apply(Map.of("from", getClass().getResource("/export.gradle")));
         project.getTasks().register("spotlessBridgeApply", task -> {
-            task.setGroup("formatting");
-            task.setDescription("Format only paths in the UTF-8 file given by -PspotlessBridgeFiles");
+            task.setGroup(GROUP);
+            task.setDescription("Format all Spotless Java targets, or only -PspotlessBridgeFiles=<a.java,b.java | list file>,"
+                    + " through the project daemon");
             task.notCompatibleWithConfigurationCache("Reads current project daemon metadata");
             task.dependsOn("spotlessBridgeStart");
             task.doLast(ignored -> {
-                Object list = project.findProperty("spotlessBridgeFiles");
-                if (list == null)
-                    throw new GradleException("Supply -PspotlessBridgeFiles=<UTF-8 path list, one file per line>");
+                Path root = project.getProjectDir().toPath();
                 try {
-                    SharedDaemon.apply(
-                            project.getProjectDir().toPath(), project.file(list).toPath());
+                    List<String> paths = requestedPaths(project, root);
+                    Path list = Files.createTempFile(SharedDaemon.state(root), "apply-files-", ".txt");
+                    try {
+                        Files.write(list, paths, StandardCharsets.UTF_8);
+                        SharedDaemon.ApplyResult result = SharedDaemon.apply(root, list);
+                        project.getLogger().lifecycle("Spotless Bridge: formatted {} {}, {} changed{}",
+                                result.formatted(), result.formatted() == 1 ? "file" : "files", result.changed(),
+                                result.skipped() == 0 ? "" : ", " + result.skipped() + " skipped (not Spotless targets)");
+                    } finally {
+                        Files.deleteIfExists(list);
+                    }
+                } catch (NoSuchFileException e) {
+                    throw new GradleException("Spotless Bridge: file not found: " + e.getFile());
+                } catch (GradleException e) {
+                    throw e;
                 } catch (Exception e) {
-                    throw new GradleException("Spotless Bridge apply failed", e);
+                    throw new GradleException("Spotless Bridge apply failed: " + e.getMessage(), e);
                 }
             });
         });
         for (String action : new String[] {"Status", "Stop"}) {
             project.getTasks().register("spotlessBridge" + action, task -> {
-                task.setGroup("formatting");
+                task.setGroup(GROUP);
                 task.setDescription(action.equals("Stop")
                         ? "Stop the project daemon and its formatter worker"
                         : "Print the project daemon PID, or -1 when it is not running");
@@ -97,6 +112,31 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
                 });
             });
         }
+    }
+
+    private static final String GROUP = "spotlessBridge";
+
+    /**
+     * Without -PspotlessBridgeFiles every Spotless Java target is formatted, matching spotlessApply.
+     * The property takes comma-separated paths, or one UTF-8 file listing a path per line.
+     */
+    private static List<String> requestedPaths(Project project, Path root) throws Exception {
+        Object property = project.findProperty("spotlessBridgeFiles");
+        if (property == null) {
+            List<String> targets = new ArrayList<>();
+            for (String key : SharedDaemon.metadata(SharedDaemon.endpoint(root)).stringPropertyNames())
+                if (key.startsWith("target.")) targets.add(key.substring("target.".length()));
+            Collections.sort(targets);
+            return targets;
+        }
+        List<String> paths = new ArrayList<>();
+        for (String path : property.toString().split(",")) if (!path.isBlank()) paths.add(path.strip());
+        if (paths.isEmpty()) throw new GradleException("Spotless Bridge: -PspotlessBridgeFiles is empty. "
+                + "Omit it to format every Spotless target, or pass paths such as -PspotlessBridgeFiles=src/main/java/A.java");
+        Path single = project.file(paths.get(0)).toPath();
+        if (paths.size() == 1 && !paths.get(0).endsWith(".java") && Files.isRegularFile(single))
+            return Files.readAllLines(single, StandardCharsets.UTF_8);
+        return paths;
     }
 
     private static final List<String> LAUNCHERS = List.of("spotless-bridge", "spotless-bridge.cmd");

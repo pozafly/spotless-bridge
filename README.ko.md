@@ -36,6 +36,14 @@ Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.1"`을 
 기존 Spotless 버전과 규칙은 그대로 두세요. 다중 프로젝트 빌드에서는 Bridge를 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 그대로 둡니다.
 
+프로젝트의 Spotless Java 대상 파일을 바로 전부 포맷하려면 다음을 실행하세요.
+
+```sh
+./gradlew spotlessBridgeApply
+```
+
+첫 실행에서 daemon이 자동으로 시작되므로 따로 시작할 필요가 없습니다.
+
 ### 2. AI 도구 연결
 
 플러그인은 `.gradle/spotless-bridge/`에 작은 실행 스크립트(런처)를 두고, 빌드나 IntelliJ의 Gradle 동기화처럼
@@ -170,23 +178,19 @@ CI는 모든 조합을 Ubuntu에서 실행하고, 그중 두 조합은 macOS에�
 포맷한 뒤에도 `spotlessCheck`, 컴파일, 관련 테스트 같은 프로젝트의 기존 검증은 그대로 실행하세요.
 OpenRewrite를 함께 쓴다면 OpenRewrite를 먼저 실행해, 수정된 코드에 Bridge 포맷이 적용되도록 하세요.
 
-### Gradle 태스크로 호출하기
+### Gradle 태스크
 
-Gradle을 이미 실행하는 스크립트라면 적용 태스크를 직접 호출할 수도 있습니다.
-UTF-8 텍스트 파일에 대상 경로를 한 줄에 하나씩, Gradle 루트 기준 상대 경로나 절대 경로로 적습니다.
+`./gradlew tasks`에서는 **SpotlessBridge tasks** 아래에 표시됩니다.
 
-```text
-src/main/java/example/Customer.java
-src/test/java/example/CustomerTest.java
-```
+| 명령 | 동작 |
+| --- | --- |
+| `./gradlew spotlessBridgeApply` | Spotless Java 대상 파일 전체를 포맷합니다. 결과는 `spotlessApply`와 같습니다 |
+| `./gradlew spotlessBridgeApply -PspotlessBridgeFiles=src/main/java/A.java,src/main/java/B.java` | 지정한 파일만 포맷합니다. Spotless 대상이 아닌 파일은 건너뜁니다 |
+| `./gradlew spotlessBridgeApply -PspotlessBridgeFiles=changed-files.txt` | UTF-8 파일에 한 줄씩 적은 파일을 포맷합니다 |
+| `./gradlew spotlessBridgeStatus` / `spotlessBridgeStop` | 프로젝트 daemon 상태를 보거나 종료합니다 |
 
-그런 다음 이 파일을 적용 태스크에 전달합니다.
-
-```sh
-./gradlew --no-configuration-cache spotlessBridgeApply -PspotlessBridgeFiles=/path/to/changed-files.txt
-```
-
-이 방식은 매번 Gradle을 평가하므로, 자주 실행되는 hook에는 런처를 사용하세요.
+경로는 Gradle 루트 기준 상대 경로나 절대 경로를 씁니다. 각 태스크는 필요하면 daemon을 시작하거나 갱신합니다.
+이 태스크들은 실행할 때마다 Gradle을 평가하므로, 자주 실행되는 AI hook에는 런처를 사용하세요.
 
 ## IntelliJ IDEA (미리보기)
 

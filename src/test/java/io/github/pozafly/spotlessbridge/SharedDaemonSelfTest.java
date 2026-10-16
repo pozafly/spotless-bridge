@@ -174,6 +174,28 @@ public final class SharedDaemonSelfTest {
             Files.writeString(build, previous);
             Files.writeString(file, source);
         }
+        // spotlessBridgeApply without arguments formats every Spotless target, byte-identical to spotlessApply.
+        Path excludedFile = file.resolveSibling("Excluded.java");
+        Map<Path, String> sources = javaSources(root);
+        for (Path path : sources.keySet()) Files.writeString(path, source);
+        Files.writeString(excludedFile, source);
+        check(gradle(root, "spotlessBridgeApply").contains("Spotless Bridge: formatted"), "no-argument apply reports counts");
+        Map<Path, String> bridged = javaSources(root);
+        for (Path path : sources.keySet()) Files.writeString(path, source);
+        Files.writeString(excludedFile, source);
+        gradle(root, "spotlessApply");
+        check(bridged.equals(javaSources(root)), "no-argument apply matches spotlessApply for every source");
+        check(Files.readString(excludedFile).equals(source), "no-argument apply leaves excluded files unchanged");
+        // Comma-separated paths select files directly; non-targets are counted, not formatted.
+        Files.writeString(file, source);
+        check(gradle(root, "spotlessBridgeApply", "-PspotlessBridgeFiles=" + root.relativize(file) + "," + excludedFile)
+                        .contains("formatted 1 file, 1 changed, 1 skipped"),
+                "comma-separated paths report formatted and skipped files");
+        check(Files.readString(file).equals(expected), "comma-separated apply output");
+        check(gradleFailure(root, "spotlessBridgeApply", "-PspotlessBridgeFiles=src/main/java/Missing.java")
+                        .contains("Spotless Bridge: file not found:"),
+                "missing apply path is reported clearly");
+        System.out.println("PASS: spotlessBridgeApply for all targets, comma-separated paths and missing files");
         SharedDaemon.stop(root);
         // Two independent Gradle callers start simultaneously. The lifetime lock allows one server only.
         ExecutorService starters = Executors.newFixedThreadPool(2);
@@ -229,6 +251,24 @@ public final class SharedDaemonSelfTest {
         command.addAll(List.of(args));
         Process process = new ProcessBuilder(command).directory(root.toFile()).inheritIO().start();
         check(process.waitFor(120, TimeUnit.SECONDS) && process.exitValue() == 0, "client failed: " + command);
+    }
+
+    private static Map<Path, String> javaSources(Path root) throws IOException {
+        Map<Path, String> sources = new TreeMap<>();
+        try (var paths = Files.walk(root.resolve("src"))) {
+            for (Path path : paths.filter(path -> path.toString().endsWith(".java")).toList())
+                if (!path.getFileName().toString().equals("Excluded.java")) sources.put(path, Files.readString(path));
+        }
+        return sources;
+    }
+
+    private static String gradleFailure(Path root, String... args) throws Exception {
+        try {
+            gradle(root, args);
+        } catch (AssertionError expected) {
+            return expected.getMessage();
+        }
+        throw new AssertionError("Gradle unexpectedly succeeded: " + List.of(args));
     }
 
     private static String gradle(Path root, String... args) throws Exception {
