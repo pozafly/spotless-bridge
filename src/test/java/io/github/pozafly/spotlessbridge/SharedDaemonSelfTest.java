@@ -31,6 +31,8 @@ public final class SharedDaemonSelfTest {
         }
         check(SharedDaemon.status(root) == pid, "editor close preserves project daemon");
         Properties endpoint = SharedDaemon.endpoint(root);
+        check(Path.of(endpoint.getProperty("javaHome")).toRealPath().equals(javaHome.toRealPath()),
+                "Gradle starts the daemon with the selected test JDK");
         long worker = SharedDaemon.workerPid(root);
         ExecutorService pool = Executors.newFixedThreadPool(20);
         try {
@@ -77,6 +79,11 @@ public final class SharedDaemonSelfTest {
         check(Files.readAllLines(counter).size() == calls + 1, "cold hook invokes Gradle exactly once");
         check(SharedDaemon.status(root) != pid && SharedDaemon.status(root) > 0, "headless hook cold start");
         check(Files.readString(file).equals(expected), "headless cold-start output");
+        check(Path.of(SharedDaemon.endpoint(root).getProperty("javaHome")).toRealPath().equals(javaHome.toRealPath()),
+                "Headless hook starts the daemon with the selected test JDK");
+        check(Path.of(Files.readAllLines(root.resolve(".gradle/spotless-bridge/client-runtime.txt")).get(1))
+                        .toRealPath().equals(javaHome.toRealPath()),
+                "Warm hook runtime uses the selected test JDK");
         pid = SharedDaemon.status(root);
         // Real process death leaves a stale endpoint; an editor must bootstrap through Gradle again.
         long orphan = SharedDaemon.workerPid(root);

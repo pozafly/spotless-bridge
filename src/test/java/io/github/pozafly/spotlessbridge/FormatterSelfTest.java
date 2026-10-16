@@ -18,6 +18,14 @@ public final class FormatterSelfTest {
         pluginRepositories = "pluginManagement { repositories { maven { url = uri('"
                 + Path.of(args[1]).toUri() + "') }; gradlePluginPortal() } }\n";
         String bridgeVersion = args[2];
+        String gradleVersion = args[3];
+        int javaVersion = Runtime.version().feature();
+        check(javaVersion >= 21, "Compatibility checks require JDK 21 or newer");
+        check(Path.of(System.getProperty("java.home")).toRealPath()
+                        .equals(Path.of(System.getenv("JAVA_HOME")).toRealPath()),
+                "Hook bootstrap JAVA_HOME must match the test runtime");
+        System.out.println("Testing Bridge " + bridgeVersion + " with consumer Gradle " + gradleVersion
+                + " / JDK " + Runtime.version());
         String version = "8.10.2";
         Path temp = Files.createTempDirectory("spotless-bridge-test-");
         Path root = temp.resolve("fixture");
@@ -27,10 +35,7 @@ public final class FormatterSelfTest {
         Files.writeString(file, SOURCE);
         Path excluded = file.resolveSibling("Excluded.java");
         Files.writeString(excluded, SOURCE);
-        Path wrapper = root.resolve("gradle/wrapper");
-        Files.createDirectories(wrapper);
-        for (String name : List.of("gradle-wrapper.jar", "gradle-wrapper.properties"))
-            Files.copy(Path.of("gradle/wrapper", name), wrapper.resolve(name));
+        installWrapper(root, gradleVersion);
         Files.copy(Path.of("gradlew"), root.resolve("gradlew"));
         root.resolve("gradlew").toFile().setExecutable(true);
         Path settings = root.resolve("settings.gradle");
@@ -263,25 +268,21 @@ public final class FormatterSelfTest {
                     "restore original Spotless version");
             System.out.println(
                     "PASS: project Spotless 8.10.2 -> 8.0.0 -> 8.10.2, Gradle parity and worker replacement");
-            kotlinDsl(temp, version, bridgeVersion, engine, javaHome);
+            kotlinDsl(temp, version, bridgeVersion, gradleVersion, javaHome);
             SharedDaemonSelfTest.run(root, file, SOURCE);
-            System.out.println("ALL TESTS PASSED; fixture=" + temp);
+            System.out.println("ALL TESTS PASSED; Gradle=" + gradleVersion + "; JDK=" + javaVersion + "; fixture=" + temp);
         } finally {
             SharedDaemon.stop(root);
         }
     }
 
-    private static void kotlinDsl(Path temp, String version, String bridgeVersion, Path engine, Path javaHome)
+    private static void kotlinDsl(Path temp, String version, String bridgeVersion, String gradleVersion, Path javaHome)
             throws Exception {
         Path root = temp.resolve("kotlin-dsl");
         Path file = root.resolve("src/main/java/KotlinDsl.java");
         Files.createDirectories(file.getParent());
         Files.writeString(file, SOURCE);
-        Files.createDirectories(root.resolve("gradle/wrapper"));
-        for (String name : List.of("gradle-wrapper.jar", "gradle-wrapper.properties"))
-            Files.copy(
-                    Path.of("gradle/wrapper", name),
-                    root.resolve("gradle/wrapper").resolve(name));
+        installWrapper(root, gradleVersion);
         Files.writeString(
                 root.resolve("settings.gradle.kts"),
                 pluginRepositories.replace("uri('", "uri(\"").replace("')", "\")")
@@ -312,6 +313,40 @@ public final class FormatterSelfTest {
         }
         SharedDaemon.stop(root);
         System.out.println("PASS: build.gradle.kts native Spotless Kotlin DSL");
+    }
+
+    private static void installWrapper(Path root, String version) throws Exception {
+        check(version.matches("[0-9]+\\.[0-9]+(?:\\.[0-9]+)?"), "Use an explicit stable Gradle version");
+        Path wrapper = root.resolve("gradle/wrapper");
+        Files.createDirectories(wrapper);
+        Files.copy(Path.of("gradle/wrapper/gradle-wrapper.jar"), wrapper.resolve("gradle-wrapper.jar"));
+        Properties properties = new Properties();
+        try (InputStream input = Files.newInputStream(Path.of("gradle/wrapper/gradle-wrapper.properties"))) {
+            properties.load(input);
+        }
+        properties.setProperty("distributionUrl", "https://services.gradle.org/distributions/gradle-" + version + "-bin.zip");
+        // The source wrapper may pin a checksum for a different distribution.
+        properties.remove("distributionSha256Sum");
+        try (OutputStream output = Files.newOutputStream(wrapper.resolve("gradle-wrapper.properties"))) {
+            properties.store(output, "Compatibility test consumer wrapper");
+        }
+        Path log = Files.createTempFile("spotless-bridge-gradle-version-", ".log");
+        Process process = new ProcessBuilder(
+                        Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                        "-classpath", wrapper.resolve("gradle-wrapper.jar").toString(),
+                        "org.gradle.wrapper.GradleWrapperMain", "--version", "--console=plain")
+                .directory(root.toFile())
+                .redirectErrorStream(true)
+                .redirectOutput(log.toFile())
+                .start();
+        if (!process.waitFor(180, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new AssertionError("Gradle distribution preparation timed out: " + log);
+        }
+        String output = Files.readString(log);
+        check(process.exitValue() == 0 && output.lines().anyMatch(line -> line.equals("Gradle " + version)),
+                "Consumer Gradle version mismatch: " + log + "\n" + output);
+        System.out.println("PASS: consumer Gradle " + version + " at " + root);
     }
 
     private static int runGradle(Path root, String task) throws Exception {

@@ -76,9 +76,14 @@ tasks.register('selfTest', JavaExec) {
     dependsOn testClasses, engineDist, publishAllPublicationsToTestRepository
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'io.github.pozafly.spotlessbridge.FormatterSelfTest'
+    // Compile with the build JDK; run consumers, workers and hook bootstrap with the selected JDK.
+    def testJavaHome = providers.gradleProperty('testJavaHome').orElse(System.getProperty('java.home')).get()
+    executable = new File(testJavaHome, "bin/${System.getProperty('os.name').startsWith('Windows') ? 'java.exe' : 'java'}").absolutePath
+    environment 'JAVA_HOME', testJavaHome
     args layout.buildDirectory.dir('engine').get().asFile.absolutePath,
             layout.buildDirectory.dir('repository').get().asFile.absolutePath,
-            project.version.toString()
+            project.version.toString(),
+            providers.gradleProperty('testGradleVersion').orElse('8.14.3').get()
     workingDir rootDir
 }
 tasks.named('check') { dependsOn 'selfTest' }
