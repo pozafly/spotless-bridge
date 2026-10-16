@@ -1,0 +1,90 @@
+name: Bug report
+description: Formatting fails, differs from spotlessApply, or the daemon misbehaves
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please check [Troubleshooting](https://github.com/pozafly/spotless-bridge#troubleshooting) first.
+        Korean is fine too. 한국어로 작성해도 됩니다.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you expected, what happened instead, and any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Your `spotless { java { ... } }` block and the commands or IDE actions that trigger the problem.
+      placeholder: |
+        1. spotless { java { palantirJavaFormat() } }
+        2. ./gradlew spotlessBridgeStart
+        3. .gradle/spotless-bridge/spotless-bridge src/main/java/Foo.java
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Where did it happen?
+      multiple: true
+      options:
+        - AI hook
+        - IntelliJ plugin
+        - Gradle task (spotlessBridgeApply etc.)
+    validations:
+      required: true
+  - type: input
+    id: bridge-version
+    attributes:
+      label: Spotless Bridge version
+      placeholder: "0.2.1"
+    validations:
+      required: true
+  - type: input
+    id: spotless-version
+    attributes:
+      label: Spotless plugin version
+      placeholder: "8.10.2"
+    validations:
+      required: true
+  - type: input
+    id: gradle-version
+    attributes:
+      label: Gradle version
+      placeholder: "9.8.1"
+    validations:
+      required: true
+  - type: input
+    id: jdk-version
+    attributes:
+      label: JDK version (running Gradle)
+      placeholder: "Temurin 21.0.6"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS and CPU
+      options:
+        - macOS ARM64
+        - macOS x64
+        - Linux x64
+        - Linux ARM64
+        - Windows x64
+        - Windows ARM64
+    validations:
+      required: true
+  - type: input
+    id: ide-version
+    attributes:
+      label: IntelliJ IDEA version (if relevant)
+      placeholder: "2026.2"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from `daemon.log`, `worker.log` or `gradle-start-*.log` in `.gradle/spotless-bridge/`.
+      render: text

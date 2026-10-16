@@ -1,5 +1,9 @@
 # Spotless Bridge
 
+[![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.pozafly.spotlessbridge)](https://plugins.gradle.org/plugin/io.github.pozafly.spotlessbridge)
+[![Verification](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 English | [한국어](README.ko.md)
 
 **Format Java with your project's own Spotless rules after every AI edit and every IntelliJ save, without waiting for Gradle each time.**

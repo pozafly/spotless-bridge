@@ -1,5 +1,9 @@
 # Spotless Bridge
 
+[![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.pozafly.spotlessbridge)](https://plugins.gradle.org/plugin/io.github.pozafly.spotlessbridge)
+[![Verification](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 [English](README.md) | 한국어
 
 **AI가 코드를 고칠 때도, IntelliJ에서 저장할 때도 매번 Gradle을 기다리지 않고 프로젝트의 Spotless 규칙으로 Java를 포맷합니다.**
