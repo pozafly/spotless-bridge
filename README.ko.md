@@ -120,7 +120,7 @@ JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
 ```
 
 작업 종료 hook에서는 위 예시처럼 변경한 Java 파일을 모아 한 번에 넘기는 것을 권장합니다.
-Java 클라이언트 하나가 전체 파일의 설정과 daemon 상태를 함께 확인합니다.
+CLI 요청 하나로 전체 파일을 전달하고, 설정과 daemon 상태 확인을 공유합니다.
 새 파일이나 제외 파일로 인한 준비 단계의 Gradle 갱신도 파일마다 반복하지 않고 묶음당 한 번만 실행합니다.
 런처가 서로 다른 hook 이벤트를 자동으로 모아 주는 것은 아닙니다.
 
@@ -205,8 +205,10 @@ AI hook에는 런처를 사용하세요.
 - 삭제된 파일은 빼고 실제로 있는 파일만 넘기세요. 파일 인자가 없으면 아무것도 하지 않습니다.
 - 오류는 `Spotless Bridge: file not found: <경로>`처럼 한 줄로 알리고 0이 아닌 종료 코드를 반환합니다.
   이때는 hook을 실패로 처리하세요.
-- 처음 실행할 때는 Gradle로 엔진을 준비합니다. 이후에는 엔진의 Java 클라이언트를 직접 실행하므로,
-  설정이 바뀌지 않았다면 등록된 대상 파일을 Gradle 없이 포맷합니다.
+- 처음 실행할 때는 Gradle로 엔진을 준비합니다. 이후에는 지원 플랫폼에서 함께 설치된 native CLI를 사용하므로,
+  설정이 바뀌지 않았다면 등록된 대상 파일을 클라이언트 JVM과 Gradle 없이 포맷합니다.
+  Windows에서 설치된 native 실행 파일이 사라지면 Gradle로 복원한 뒤 요청을 보냅니다.
+  Windows ARM64는 Gradle 환경변수 재사용 문제를 피하려고 준비 단계에 `--no-daemon`을 사용합니다. warm hook은 계속 Gradle을 건너뜁니다.
 - IntelliJ는 설치되어 있지 않거나 실행 중이 아니어도 됩니다.
 - `tools/spotless-bridge/ai-hook.py`를 쓰던 0.1.0에서 올라왔다면, hook이 런처를 실행하도록 바꾸고
   `tools/spotless-bridge/`를 삭제하세요.
@@ -255,7 +257,8 @@ IntelliJ에는 LF 줄바꿈 텍스트를 반환하고, hook으로 저장하는 �
 - 포매터가 Bridge보다 높은 JDK를 요구할 수 있습니다. 예를 들어 Google Java Format 1.30.0은 JDK 21이 필요합니다.
   Bridge는 프로젝트가 선택한 포매터 버전을 낮추지 않고 호환 오류를 그대로 알려 줍니다.
 - Bridge는 **Gradle 프로젝트의 Java 파일을 전체 파일 단위로** 포맷합니다. Maven 지원은 준비 중이며, 다른 언어는 지원하지 않습니다.
-- CI는 Linux와 macOS에서 실행합니다. Windows 런처도 포함되어 있지만 아직 검증하지 않았습니다.
+- native CLI 통합 CI는 Linux·macOS·Windows 각각의 x64·ARM64에서 JDK 21·Gradle 8.14.3·Spotless 8.10.2로 실행합니다.
+  아래 JDK·Gradle 회귀 검사는 별도로 Linux와 macOS에서 실행합니다.
 - Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, 직렬화할 수 없는 포맷 단계는 지원하지 않습니다.
   빌드에서 configuration cache를 켜 두었다면 Bridge 태스크는 `--no-configuration-cache`로 실행하세요.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
@@ -264,7 +267,7 @@ IntelliJ에는 LF 줄바꿈 텍스트를 반환하고, hook으로 저장하는 �
 
 ### 검증한 조합
 
-Bridge 0.1.1은 다음 조합으로 검증했습니다.
+아직 공개하지 않은 Bridge 0.2.0 개발 빌드는 다음 조합으로 검증했습니다.
 
 | JDK | Gradle | Spotless 검증 범위 |
 | --- | --- | --- |

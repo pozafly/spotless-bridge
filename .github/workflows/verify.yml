@@ -24,7 +24,7 @@ jobs:
         include:
           - gradle: "9.8.1"
             java: "25"
-          # macOS covers the POSIX launcher and daemon lifecycle on a second OS; Windows is not verified yet.
+          # macOS covers the full regression suite on a second OS; native.yml covers Windows CLI integration.
           - os: macos-latest
             gradle: "8.14.3"
             java: "17"

@@ -121,7 +121,7 @@ Gradle·Spotless 버전 정책 검사는 JDK 17·21의 Gradle 8.14.3 조합에�
 실제 IDE UI 저장 동작과 Marketplace 승인은 별도입니다. IDE 검증 상세는
 [소스 설치 안내](install-from-source.ko.md#게시-없이-동일-zip으로-여러-ide-검증)를 참고하세요.
 
-`verify.yml`은 Ubuntu 조합에 더해 macOS에서 Gradle 8.14.3·JDK 17과 Gradle 9.8.1·JDK 21을 실행합니다. Windows는 아직 CI가 없습니다.
+`verify.yml`은 Ubuntu 조합에 더해 macOS에서 Gradle 8.14.3·JDK 17과 Gradle 9.8.1·JDK 21을 실행합니다. Windows x64·ARM64는 별도의 `native.yml`에서 JDK 21·Gradle 8.14.3으로 CLI와 런처를 검사합니다.
 `spotless-latest.yml`은 매주 월요일 Plugin Portal의 최신 Spotless 버전을 찾아 `-PtestSpotlessVersion`으로 전체 검사를 실행합니다.
 이 job이 실패하면 Spotless 내부 API 변경이나 허용 범위 밖 버전(예: 9.x)이 나온 것이므로 지원 범위와 구현을 점검하세요.
 
@@ -136,9 +136,10 @@ Gradle·Spotless 버전 정책 검사는 JDK 17·21의 Gradle 8.14.3 조합에�
 hook 런처(`src/main/resources/spotless-bridge/spotless-bridge`, `.cmd`)는 플러그인 JAR에 포함되고, 플러그인이 적용될 때마다
 (빌드, IDE 동기화 등 모든 Gradle 실행) `.gradle/spotless-bridge/`에 씁니다. 내용이 같으면 다시 쓰지 않으며, 새로 쓰면
 `client-runtime.txt`를 지워 다음 hook이 이 플러그인의 엔진을 준비하게 합니다(0.1.0 엔진은 `--hook`을 모르기 때문).
-런처는 자기 위치에서 Gradle 루트를 찾고, `client-runtime.txt`나 엔진 JAR가 없을 때만 `gradlew spotlessBridgeStart`를
-실행한 뒤 `GradleFormatter --hook <root> <files...>`를 직접 실행합니다. 포맷 로직은 엔진에 있으므로 런처는 단순하게 유지합니다.
-0.1.0 스크립트가 쓰는 `<root> <list-file>` 호출 방식도 계속 지원합니다. Windows 런처는 CI에서 검증하지 않습니다.
+런처는 자기 위치에서 Gradle 루트를 찾고 지원 플랫폼에서는 native CLI로 요청을 보냅니다. native CLI는 준비가
+필요할 때만 Gradle wrapper로 `spotlessBridgeStart`를 실행합니다. Windows 런처는 설치된 CLI가 사라졌을 때도
+Gradle로 복원한 뒤 요청합니다. 그 밖의 Java 대체 경로는 `GradleFormatter --hook <root> <files...>`를 사용합니다.
+0.1.0 스크립트가 쓰는 `<root> <list-file>` 호출 방식도 계속 지원합니다. Windows 런처는 native CI에서 검사합니다.
 
 공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
 게시 자격 증명은 Git에 넣지 않고 저장소 secret `GRADLE_PUBLISH_KEY`, `GRADLE_PUBLISH_SECRET`에 둡니다.
@@ -157,6 +158,9 @@ IDE ZIP의 Marketplace 업로드는 별도 절차입니다. 실제 설치·설�
 `native/`는 외부 crate 없는 Rust 1.90.0 클라이언트입니다. `gradle.properties`와 `native/Cargo.toml` 버전을 함께 올립니다.
 기본 Gradle 빌드는 호스트용 실행 파일을 JAR에 포함합니다. 사용자의 컴퓨터에서는 Cargo를 실행하지 않습니다.
 `.github/workflows/native.yml`이 macOS·Linux·Windows의 x64·ARM64에서 단위 테스트와 실제 소비 프로젝트 검사를 수행합니다.
+Windows ARM64의 준비 단계는 Gradle 8.14.3의 환경변수 갱신 문제를 피하려고 `--no-daemon`을 사용합니다. warm 요청에는 영향이 없습니다.
+Windows JVM의 Unicode 인자 손실을 피하려고 classpath는 상대 경로, worker의 snapshot 인자는 ASCII URI를 사용합니다.
+daemon 종료는 worker와 JVM의 실제 종료까지 기다려 Windows의 JAR 파일 잠금을 해제합니다.
 Linux는 musl로 정적 링크합니다. 이 여섯 artifact를 모은 JAR로 기존 JDK·Gradle 매트릭스를 검사하고 배포합니다.
 `-PnativeCliDirectory=build/native`는 이미 빌드한 artifact를 사용하는 옵션이며, `verifyNativeDistribution`이 누락을 차단합니다.
 전체 플랫폼 확인은 GitHub CI가 실행된 뒤 판정합니다. 로컬 macOS 통과를 Windows·Linux 통과로 표현하지 않습니다.

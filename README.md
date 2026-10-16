@@ -121,7 +121,7 @@ JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
 ```
 
 For task-completion hooks, pass all changed Java files in one invocation, as above.
-One Java client prepares the whole batch; configuration and daemon checks are shared across the files,
+One CLI request submits the whole batch; configuration and daemon checks are shared across the files,
 and new or excluded files trigger one preparation refresh for the batch instead of one per file.
 The launcher does not queue separate hook events.
 
@@ -207,8 +207,10 @@ so AI hooks should use the launcher instead.
 - Pass only existing files; leave out deleted ones. With no file arguments, the launcher does nothing.
 - Errors are reported in one line, such as `Spotless Bridge: file not found: <path>`, with a nonzero exit code.
   Treat that as a hook failure.
-- The first call prepares the engine through Gradle. Later calls start the engine's Java client directly,
-  so known target files are formatted without Gradle while the configuration is unchanged.
+- The first call prepares the engine through Gradle. Later calls use the bundled native CLI on supported platforms,
+  so known target files are formatted without a client JVM or Gradle while the configuration is unchanged.
+  On Windows, a missing installed native executable is restored through Gradle before the request is sent.
+  Windows ARM64 preparation uses `--no-daemon` to avoid stale Gradle environment variables; warm hooks still bypass Gradle.
 - IntelliJ doesn't need to be installed or running.
 - If you used 0.1.0, which ran `tools/spotless-bridge/ai-hook.py`, point your hook at the launcher
   and delete `tools/spotless-bridge/`.
@@ -260,7 +262,8 @@ run with a warning.
 - Formatters can need a newer JDK than Bridge. For example, Google Java Format 1.30.0 requires JDK 21.
   Bridge keeps the formatter version your project chose and reports the incompatibility instead of downgrading it.
 - Bridge formats **whole Java files in Gradle projects**. Maven support is in progress; other languages are not supported.
-- CI runs on Linux and macOS. The Windows launcher is included but not yet verified.
+- Native CLI integration CI runs on Linux, macOS and Windows, each on x64 and ARM64,
+  using JDK 21, Gradle 8.14.3 and Spotless 8.10.2. The separate JDK/Gradle regression matrix below runs on Linux and macOS.
 - Not supported: Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, and non-serializable formatting steps.
   If your build enables the configuration cache, run Bridge tasks with `--no-configuration-cache`.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
@@ -269,7 +272,7 @@ run with a warning.
 
 ### Tested combinations
 
-Bridge 0.1.1 is tested with:
+The unpublished Bridge 0.2.0 development build is tested with:
 
 | JDK | Gradle | Spotless verification |
 | --- | --- | --- |
