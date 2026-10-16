@@ -20,7 +20,8 @@ public final class FormatterSelfTest {
         String bridgeVersion = args[2];
         String gradleVersion = args[3];
         int javaVersion = Runtime.version().feature();
-        check(javaVersion >= 21, "Compatibility checks require JDK 21 or newer");
+        check(javaVersion >= 17, "Compatibility checks require JDK 17 or newer");
+        String googleVersion = javaVersion < 21 ? "1.28.0" : "1.30.0";
         check(Path.of(System.getProperty("java.home")).toRealPath()
                         .equals(Path.of(System.getenv("JAVA_HOME")).toRealPath()),
                 "Hook bootstrap JAVA_HOME must match the test runtime");
@@ -164,7 +165,19 @@ public final class FormatterSelfTest {
             System.out.println("PASS: Palantir 2.97.0 -> 2.96.0 resolved from project configuration");
             String google = initial.replace(
                     "palantirJavaFormat(providers.gradleProperty('palantirVersion').getOrElse('2.97.0'))",
-                    "googleJavaFormat('1.30.0')");
+                    "googleJavaFormat('" + googleVersion + "')");
+            if (javaVersion == 17) {
+                Files.writeString(build, google.replace("1.28.0", "1.30.0"));
+                try {
+                    formatter.format(file, SOURCE);
+                    throw new AssertionError("JDK 17 must reject Google Java Format 1.30.0, not downgrade it");
+                } catch (WorkerClient.SourceException expected) {
+                    check(expected.getMessage().contains("1.30.0 requires JVM 21+"),
+                            "formatter JDK requirement must reach the caller: " + expected.getMessage());
+                }
+                check(Files.readString(file).equals(SOURCE), "unsupported formatter preserves the source file");
+                System.out.println("PASS: JDK 17 rejects Google Java Format 1.30.0 without a silent downgrade");
+            }
             Files.writeString(build, google);
             String googleResult = formatter.format(file, SOURCE);
             checkGolden("google", googleResult);
@@ -268,7 +281,7 @@ public final class FormatterSelfTest {
                     "restore original Spotless version");
             System.out.println(
                     "PASS: project Spotless 8.10.2 -> 8.0.0 -> 8.10.2, Gradle parity and worker replacement");
-            kotlinDsl(temp, version, bridgeVersion, gradleVersion, javaHome);
+            kotlinDsl(temp, version, bridgeVersion, gradleVersion, javaHome, googleVersion);
             SharedDaemonSelfTest.run(root, file, SOURCE);
             System.out.println("ALL TESTS PASSED; Gradle=" + gradleVersion + "; JDK=" + javaVersion + "; fixture=" + temp);
         } finally {
@@ -276,7 +289,8 @@ public final class FormatterSelfTest {
         }
     }
 
-    private static void kotlinDsl(Path temp, String version, String bridgeVersion, String gradleVersion, Path javaHome)
+    private static void kotlinDsl(
+            Path temp, String version, String bridgeVersion, String gradleVersion, Path javaHome, String googleVersion)
             throws Exception {
         Path root = temp.resolve("kotlin-dsl");
         Path file = root.resolve("src/main/java/KotlinDsl.java");
@@ -298,10 +312,10 @@ public final class FormatterSelfTest {
                     java {
                         shortenFullyQualifiedTypes()
                         removeUnusedImports()
-                        googleJavaFormat("1.30.0")
+                        googleJavaFormat("%s")
                     }
                 }
-                """.formatted(bridgeVersion, version));
+                """.formatted(bridgeVersion, version, googleVersion));
         try (GradleFormatter formatter = new GradleFormatter(root, javaHome, List.of(), () -> {})) {
             String result = formatter.format(file, SOURCE);
             check(
