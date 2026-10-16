@@ -50,3 +50,42 @@ jobs:
           name: spotless-bridge-engine-${{ matrix.os || 'ubuntu-latest' }}-gradle-${{ matrix.gradle }}-jdk-${{ matrix.java }}
           path: build/engine/
           if-no-files-found: error
+
+  intellij-adapter:
+    name: IntelliJ SDK, Safe Mode and Plugin Verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Read pinned SDK version
+        run: |
+          echo "IDEA_VERSION=$(sed -n 's/^ideaSdkVersion=//p' gradle.properties)" >> "$GITHUB_ENV"
+          echo "IDEA_SHA256=$(sed -n 's/^ideaSdkLinuxSha256=//p' gradle.properties)" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        id: idea-sdk
+        with:
+          path: ${{ runner.temp }}/idea-sdk
+          key: idea-sdk-linux-${{ env.IDEA_VERSION }}-${{ env.IDEA_SHA256 }}
+      - name: Download pinned IntelliJ SDK
+        if: steps.idea-sdk.outputs.cache-hit != 'true'
+        run: |
+          archive="$RUNNER_TEMP/idea.tar.gz"
+          curl --fail --location --retry 3 "https://download.jetbrains.com/idea/idea-${IDEA_VERSION}.tar.gz" --output "$archive"
+          printf '%s  %s\n' "$IDEA_SHA256" "$archive" | sha256sum --check -
+          mkdir -p "$RUNNER_TEMP/idea-sdk"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/idea-sdk" --strip-components=1
+      - name: Verify SDK, Safe Mode and packaged plugin
+        run: ./gradlew --no-daemon --console=plain verifyIdeaPlugin -PideaHome="$RUNNER_TEMP/idea-sdk"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spotless-bridge-intellij-verification
+          path: |
+            build/distributions/spotless-bridge-*.zip
+            build/reports/plugin-verifier/
+            build/reports/tests/ideaTest/
+          if-no-files-found: warn

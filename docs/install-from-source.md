@@ -44,13 +44,36 @@ Build the IDE plugin ZIP from the checkout:
 JAVA_HOME=/path/to/jdk21 ./gradlew pluginZip
 ```
 
-The build uses the IntelliJ SDK at `/Applications/IntelliJ IDEA.app/Contents`.
+The IDE adapter uses IntelliJ IDEA **2026.2.3 (IU-262.10968.63)**, pinned in `gradle.properties`.
+The default SDK location is `/Applications/IntelliJ IDEA.app/Contents`. `verifyIdeaSdk` rejects a different
+product, version, or build before compilation, even if you override the location. Use the complete IDE
+distribution including its JBR: this SDK contains Java 25 classes, so IDE compilation and tests use its
+bundled JBR while Gradle itself runs on JDK 21. Adapter bytecode remains Java 21; the engine remains Java 17.
 If IntelliJ is installed elsewhere on macOS, add `-PideaHome=/path/to/IntelliJ/Contents`.
-The ZIP supports IntelliJ IDEA builds `262.10968` through `262.*`.
+The ZIP declares IntelliJ IDEA builds `262.10968.63` through `262.*`; only the pinned SDK has been verified.
+A later 262 build still needs verification before it is added to the tested list.
 
 In IntelliJ, open **Settings → Plugins → gear menu → Install Plugin from Disk…** and select
 `build/distributions/spotless-bridge-0.1.1.zip`. If you installed an earlier development build,
 disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea-preview) in the README.
+
+### Verify the IntelliJ adapter without publishing
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaHome=/path/to/pinned/IDE
+```
+
+This runs SDK validation, the Safe Mode regression tests, ZIP packaging and Plugin Verifier **1.410**.
+Reports are under `build/reports/plugin-verifier/` and `build/reports/tests/ideaTest/`.
+Binary compatibility errors, invalid plugins and forbidden API usage fail the task. Warnings remain
+visible in the report; a successful verification is not Marketplace approval or an IDE UI smoke test.
+The CI has a separate Ubuntu IDE job which downloads the pinned SDK and checks its SHA-256. The
+existing 11 engine jobs do not need an SDK. Neither verification task uploads anything.
+
+Formatting is unavailable in Safe Mode. Trust the project through IntelliJ's own UI before enabling it;
+the plugin never grants trust automatically. The check runs again before using a cached formatter.
+The tests mock the IDE trust response to check request gating; manually test the actual Safe Mode UI,
+Reformat Code, save actions and shared daemon PID in a clean IDE before release.
 
 ## Development
 
@@ -92,8 +115,8 @@ Java 17-targeted engine on the selected consumer JDK, which covers Gradle, the d
 Ubuntu CI runs four Gradle versions each on JDK 17 and 21, plus JDK 25 with Gradle 9.8.1: the nine combinations
 in the [compatibility table](../README.md#requirements-and-compatibility).
 Google Java Format is pinned to 1.28.0 in JDK 17 fixtures and 1.30.0 in JDK 21/25 fixtures.
-The engine and tests compile with `--release 17`; the IntelliJ adapter keeps `--release 21` for its IDE SDK.
+The engine and engine tests compile with `--release 17`; the IntelliJ adapter and its tests use the pinned SDK JBR with `--release 21`.
 Selecting an external JDK 17 for formatting does not change IntelliJ's own runtime requirements.
 
-The IntelliJ SDK is needed only for `pluginZip`. For implementation details, regression checks, and
+The IntelliJ SDK is needed for IDE packaging and verification tasks, but not engine checks. For implementation details, regression checks, and
 publishing instructions, see the [maintainer notes (Korean)](maintenance.md).
