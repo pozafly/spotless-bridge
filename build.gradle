@@ -32,13 +32,9 @@ publishing.publications.withType(MavenPublication).configureEach {
 tasks.withType(Jar).configureEach {
     from('LICENSE') { into 'META-INF' }
 }
-// The hook script and its license ship inside the plugin so spotlessBridgeInstallHook can write a matching copy.
+// The hook launchers (src/main/resources/spotless-bridge) ship with their license for spotlessBridgeInstallHook.
 tasks.named('processResources', ProcessResources) {
-    inputs.property('version', project.version)
-    into('spotless-bridge') {
-        from('scripts/ai-hook.py') { filter { it.replace('@spotlessBridgeVersion@', project.version.toString()) } }
-        from('LICENSE')
-    }
+    into('spotless-bridge') { from('LICENSE') }
 }
 
 repositories { mavenCentral() }
