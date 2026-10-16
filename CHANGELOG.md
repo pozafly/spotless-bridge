@@ -3,12 +3,17 @@
 All notable changes to Spotless Bridge are documented here. The release workflow publishes the section
 for each `v<version>` tag as its GitHub Release notes.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-10-16
 
 - Bundle a Rust hook client in the Gradle plugin, selected and installed per OS/CPU without a separate user runtime.
 - Apply hook batches inside the existing Java daemon, avoiding a new client JVM on warm requests.
 - Refresh through Gradle once when needed; never automatically retry an ambiguous response after sending an apply request.
 - Add native packaging and consumer checks for macOS, Linux and Windows on x64 and ARM64.
+
+### Upgrading from 0.1.1
+
+Change the Bridge plugin version to `0.2.0` and run Gradle once to refresh the hook launcher.
+Keep the existing hook command; the native client is installed automatically for supported platforms.
 
 ## [0.1.1]
 
@@ -44,5 +49,6 @@ The launcher appears after the next Gradle run, and its first call prepares the 
 Initial GitHub release with the Gradle plugin, the IntelliJ adapter, and a Python AI hook script.
 It was not published to the Gradle Plugin Portal.
 
+[0.2.0]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.0
 [0.1.1]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.1.1
 [0.1.0]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.1.0

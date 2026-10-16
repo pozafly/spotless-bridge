@@ -10,7 +10,7 @@ Spotless Bridge 소스 디렉터리와 **JDK 21**이 필요합니다. 예시에�
 - `/path/to/spotless-bridge`: Spotless Bridge 소스 디렉터리
 - `/path/to/jdk21`: JDK 21 설치 경로
 
-## 네이티브 CLI 빌드 준비 (0.2.0 개발판)
+## 네이티브 CLI 빌드 준비 (0.2.0)
 
 소스에서 빌드할 때는 rustup으로 Rust를 준비합니다. `native/rust-toolchain.toml`에 Rust 1.90.0이 고정되어 있고,
 Gradle 리소스 처리 시 Cargo가 현재 컴퓨터용 CLI를 빌드합니다. 외부 crate 의존성은 없습니다.

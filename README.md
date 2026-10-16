@@ -26,8 +26,7 @@ memory to keep the formatter ready instead of waiting for it on every edit**.
 
 ## Performance
 
-The Rust CLI and timings below describe the **unpublished 0.2.0 development build**. The published 0.1.1
-used in Quick start uses a Java client; to try the Rust CLI, [build from source](docs/install-from-source.md).
+Starting with **0.2.0**, the Gradle plugin includes the Rust CLI. No separate Rust installation is required.
 
 **A warm AI hook takes 22 ms — about 22× faster than `spotlessApply`.**
 The launcher uses a Rust CLI bundled in the Gradle plugin, so hooks reach the daemon without starting a JVM.
@@ -53,11 +52,11 @@ Add Spotless Bridge to the `plugins` block of your **root** `build.gradle`, next
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // your existing Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.1.1'
+    id 'io.github.pozafly.spotlessbridge' version '0.2.0'
 }
 ```
 
-In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.1"`.
+In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.2.0"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
@@ -259,7 +258,7 @@ run with a warning.
 
 ### Tested combinations
 
-Bridge 0.1.1 and the 0.2.0 development build are tested with **JDK 17 and 21** on **Gradle 8.14.3, 8.14.6, 9.0.0, and 9.8.1**, and with **JDK 25**
+Bridge 0.2.0 is tested with **JDK 17 and 21** on **Gradle 8.14.3, 8.14.6, 9.0.0, and 9.8.1**, and with **JDK 25**
 on **Gradle 9.8.1**. Each combination runs the full regression suite on Spotless 8.10.2 and an output-parity check on Spotless 8.0.0.
 
 ## Release notes

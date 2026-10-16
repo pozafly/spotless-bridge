@@ -10,7 +10,7 @@ You need a Spotless Bridge source checkout and **JDK 21**. The examples use thes
 - `/path/to/spotless-bridge`: your Spotless Bridge checkout
 - `/path/to/jdk21`: a JDK 21 installation
 
-## Native CLI build prerequisites (0.2.0 development)
+## Native CLI build prerequisites (0.2.0)
 
 Install Rust via rustup before building from source. `native/rust-toolchain.toml` pins Rust 1.90.0;
 Cargo builds the host CLI automatically when Gradle processes resources. The native client has no external crates.

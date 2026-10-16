@@ -26,8 +26,7 @@ Prettier를 불러와 포맷합니다. Spotless Bridge는 같은 아이디어를
 
 ## 성능
 
-Rust CLI와 아래 수치는 **아직 배포하지 않은 0.2.0 개발 빌드** 기준입니다. 빠른 시작의 공개 버전 0.1.1은
-Java 클라이언트를 사용합니다. Rust CLI를 써 보려면 [소스에서 설치](docs/install-from-source.ko.md)하세요.
+**0.2.0부터** Gradle 플러그인에 Rust CLI가 포함됩니다. Rust를 별도로 설치할 필요가 없습니다.
 
 **daemon이 준비된 상태에서 AI hook 한 번에 22ms — `spotlessApply`보다 약 22배 빠릅니다.**
 런처는 Gradle 플러그인에 포함된 Rust CLI를 사용하므로, hook이 JVM을 새로 띄우지 않고 daemon에 바로 요청합니다.
@@ -53,11 +52,11 @@ Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // 기존 Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.1.1'
+    id 'io.github.pozafly.spotlessbridge' version '0.2.0'
 }
 ```
 
-Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.1"`을 추가합니다.
+Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.2.0"`을 추가합니다.
 기존 Spotless 버전과 규칙은 그대로 두세요. 멀티 프로젝트 빌드라면 Bridge는 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 건드리지 않아도 됩니다.
 
@@ -253,7 +252,7 @@ AI hook에서는 런처를 사용하세요.
 
 ### 검증한 조합
 
-Bridge 0.1.1과 0.2.0 개발 빌드는 **JDK 17·21**과 **Gradle 8.14.3·8.14.6·9.0.0·9.8.1**의 모든 조합, 그리고 **JDK 25**와 **Gradle 9.8.1** 조합에서 검증했습니다.
+Bridge 0.2.0은 **JDK 17·21**과 **Gradle 8.14.3·8.14.6·9.0.0·9.8.1**의 모든 조합, 그리고 **JDK 25**와 **Gradle 9.8.1** 조합에서 검증했습니다.
 각 조합에서 Spotless 8.10.2로 전체 회귀 검사를, Spotless 8.0.0으로 포맷 결과 일치 검사를 실행합니다.
 
 ## 변경 내역
