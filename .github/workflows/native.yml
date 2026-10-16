@@ -31,12 +31,8 @@ jobs:
         with:
           toolchain: '1.90.0'
           targets: ${{ matrix.target }}
-      - name: Set up static Linux linker
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          echo 'RUSTFLAGS=-C linker=musl-gcc' >> "$GITHUB_ENV"
+      # The musl targets carry their own libc. Use the host linker; musl-gcc's
+      # wrapper can produce a crashing static PIE on x64 (rust-lang/rust#95926).
       - name: Statically link the Windows C runtime
         if: runner.os == 'Windows'
         run: echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"

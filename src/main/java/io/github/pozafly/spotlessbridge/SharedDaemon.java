@@ -144,7 +144,7 @@ public final class SharedDaemon {
                 String token = UUID.randomUUID().toString() + UUID.randomUUID();
                 Path launch = Files.createTempFile(state, "launch-", ".token");
                 Files.writeString(launch, token);
-                Process process = new ProcessBuilder(
+                ProcessBuilder launchBuilder = new ProcessBuilder(
                                 Path.of(javaHome, "bin", windows() ? "java.exe" : "java")
                                         .toString(),
                                 "-Xmx128m",
@@ -162,8 +162,12 @@ public final class SharedDaemon {
                         .redirectInput(ProcessBuilder.Redirect.from(new File(windows() ? "NUL" : "/dev/null")))
                         .redirectErrorStream(true)
                         .redirectOutput(ProcessBuilder.Redirect.appendTo(
-                                state.resolve("daemon.log").toFile()))
-                        .start();
+                                state.resolve("daemon.log").toFile()));
+                // Gradle updates the Java environment between builds. Explicitly copy it so a
+                // removed variable is not inherited from the long-lived Gradle process's OS environment.
+                launchBuilder.environment().clear();
+                launchBuilder.environment().putAll(System.getenv());
+                Process process = launchBuilder.start();
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
                 while (System.nanoTime() < deadline && process.isAlive()) {
                     try {

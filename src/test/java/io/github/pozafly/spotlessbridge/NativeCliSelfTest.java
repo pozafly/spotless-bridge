@@ -104,6 +104,7 @@ public final class NativeCliSelfTest {
             SharedDaemon.stop(root);
             nativeApply(root, file);
             check(SharedDaemon.status(root) > 0 && SharedDaemon.status(root) != pid, "headless restart");
+            SharedDaemon.stop(root); // Windows does not allow deleting the JAR of a running JVM.
             Files.delete(Path.of(Files.readAllLines(state.resolve("client-runtime.txt")).get(0)));
             nativeApply(root, file);
             check(Files.isRegularFile(Path.of(Files.readAllLines(state.resolve("client-runtime.txt")).get(0))), "missing engine recovery");
@@ -121,6 +122,16 @@ public final class NativeCliSelfTest {
             check(Files.isRegularFile(binary), "Gradle restores missing native binary");
             nativeApply(root, file);
             System.out.println("PASS: native package, cold/warm, launcher, parity, Unicode, config/new/excluded files, failure safety, concurrency, recovery");
+        } catch (Exception | AssertionError failure) {
+            try (var logs = Files.walk(state)) {
+                for (Path log : logs.filter(p -> p.toString().endsWith(".log")).toList()) {
+                    System.err.println("Diagnostic log: " + log);
+                    System.err.println(Files.readString(log));
+                }
+            } catch (IOException diagnosticFailure) {
+                failure.addSuppressed(diagnosticFailure);
+            }
+            throw failure;
         } finally {
             SharedDaemon.stop(root);
         }
@@ -154,7 +165,7 @@ public final class NativeCliSelfTest {
     private static void gradle(Path root, String... args) throws Exception {
         List<String> command = new ArrayList<>(List.of(
                 Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString(),
-                "-classpath", root.resolve("gradle/wrapper/gradle-wrapper.jar").toString(),
+                "-classpath", "gradle/wrapper/gradle-wrapper.jar",
                 "org.gradle.wrapper.GradleWrapperMain", "--console=plain", "--no-configuration-cache"));
         command.addAll(List.of(args));
         run(root, 0, command);
@@ -175,7 +186,8 @@ public final class NativeCliSelfTest {
             throw new AssertionError("Command timeout; log: " + log);
         }
         String output = Files.readString(log, StandardCharsets.UTF_8);
-        check(process.exitValue() == expected, "exit=" + process.exitValue() + ", expected=" + expected + "\n" + output);
+        check(process.exitValue() == expected, "exit=" + process.exitValue() + ", expected=" + expected
+                + "\ncommand=" + command + "\n" + output);
         return output;
     }
 

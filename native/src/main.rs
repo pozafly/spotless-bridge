@@ -298,7 +298,7 @@ fn bootstrap(root: &Path, state: &Path) -> Result<()> {
     let mut command = Command::new(java);
     command
         .args(["-classpath"])
-        .arg(wrapper)
+        .arg("gradle/wrapper/gradle-wrapper.jar")
         .args([
             "org.gradle.wrapper.GradleWrapperMain",
             "--no-configuration-cache",
