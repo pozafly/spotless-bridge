@@ -12,6 +12,7 @@ First release published to the Gradle Plugin Portal.
 - `spotlessBridgeInstallHook` writes the AI hook launchers (`spotless-bridge` for macOS and Linux,
   `spotless-bridge.cmd` for Windows) and their license into `tools/spotless-bridge/`.
 - The launcher prepares the engine again when it is missing, for example after part of `.gradle` was removed.
+- Hook errors are reported in one line, such as `Spotless Bridge: file not found: <path>`, with exit code 1.
 - `spotlessBridgeStart` warns when an installed launcher differs from the one in the plugin, or when the
   0.1.0 `ai-hook.py` is still present.
 - Gradle and Spotless version checks: Gradle 8.14.3 or newer and below 10.0, and Spotless 8.x, are accepted.
@@ -28,8 +29,8 @@ First release published to the Gradle Plugin Portal.
 
 ### Upgrading from 0.1.0
 
-Run `./gradlew spotlessBridgeInstallHook`, then `./gradlew spotlessBridgeStart` once so the project switches
-to the new engine. Point your AI hook at `tools/spotless-bridge/spotless-bridge` and delete `ai-hook.py`.
+Run `./gradlew spotlessBridgeInstallHook`, point your AI hook at `tools/spotless-bridge/spotless-bridge`, and delete
+`ai-hook.py`. The next hook call prepares the new engine through Gradle once.
 
 ## [0.1.0]
 

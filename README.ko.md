@@ -49,8 +49,8 @@ macOS·Linux용 `tools/spotless-bridge/spotless-bridge`, Windows용 `spotless-br
 런처는 적용한 플러그인 버전의 엔진을 실행하기만 하므로, 플러그인을 업그레이드해도 다시 설치할 일은 거의 없습니다.
 런처를 갱신해야 하면 Bridge가 경고합니다. Windows 런처는 아직 CI에서 검증하지 않습니다.
 
-`ai-hook.py`를 쓰던 0.1.0에서 업그레이드한다면, 런처를 설치한 뒤 `./gradlew spotlessBridgeStart`를 한 번 실행해
-새 엔진으로 바꾸고, AI hook이 `spotless-bridge`를 실행하도록 고친 다음 `ai-hook.py`를 삭제하세요.
+`ai-hook.py`를 쓰던 0.1.0에서 업그레이드한다면, 위처럼 런처를 설치하고 AI hook이 `spotless-bridge`를 실행하도록 고친 뒤
+`ai-hook.py`를 삭제하세요. 다음 hook 호출에서 Gradle로 새 엔진을 한 번 준비합니다.
 
 ### 3. AI 도구 연결
 

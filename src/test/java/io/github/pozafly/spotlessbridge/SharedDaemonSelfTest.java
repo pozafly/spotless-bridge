@@ -128,6 +128,8 @@ public final class SharedDaemonSelfTest {
         check(gradle(root, "spotlessBridgeStart").contains("differs from the launcher"), "Gradle start warns about changed launcher");
         gradle(root, "spotlessBridgeInstallHook");
         check(Files.readString(installedHook).equals(launcher), "reinstall restores the packaged launcher");
+        check(!Files.exists(root.resolve(".gradle/spotless-bridge/client-runtime.txt")),
+                "reinstall makes the next hook prepare this plugin's engine");
         check(!gradle(root, "spotlessBridgeStart").contains("spotlessBridgeInstallHook"), "Gradle start accepts packaged launcher");
         // Hook scripts from 0.1.0 pass a list file instead of paths; the engine still accepts them.
         Files.writeString(file, source);
@@ -136,6 +138,9 @@ public final class SharedDaemonSelfTest {
         Files.writeString(hookDirectory.resolve("ai-hook.py"), "# 0.1.0 hook\n");
         check(gradle(root, "spotlessBridgeStart").contains("is replaced by the launcher"), "legacy Python hook warns");
         Files.delete(hookDirectory.resolve("ai-hook.py"));
+        String missing = hookOutput(root, root.resolve("src/main/java/Missing.java"), 1);
+        check(missing.startsWith("Spotless Bridge: file not found:") && !missing.contains("\tat "),
+                "hook reports a missing file in one line: " + missing);
         // Partial .gradle cleanup can remove the engine while client-runtime.txt survives; the launcher rebuilds it.
         Path engineJar = Path.of(Files.readAllLines(root.resolve(".gradle/spotless-bridge/client-runtime.txt")).get(0));
         Files.delete(engineJar);
@@ -203,6 +208,10 @@ public final class SharedDaemonSelfTest {
     }
 
     private static String hook(Path root, Path file) throws Exception {
+        return hookOutput(root, file, 0);
+    }
+
+    private static String hookOutput(Path root, Path file, int expectedExit) throws Exception {
         // Use the shipped hook adapter as an external process, with no editor client alive.
         Path log = Files.createTempFile("shared-daemon-hook-", ".log");
         Process process = new ProcessBuilder(
@@ -216,7 +225,7 @@ public final class SharedDaemonSelfTest {
             process.destroyForcibly();
             throw new AssertionError("Hook timeout: " + log);
         }
-        check(process.exitValue() == 0, "Hook failed: " + Files.readString(log));
+        check(process.exitValue() == expectedExit, "Hook exit " + process.exitValue() + ": " + Files.readString(log));
         return Files.readString(log);
     }
 

@@ -49,8 +49,8 @@ and their `LICENSE`. Add `-PspotlessBridgeHookDir=<dir>` to use another director
 The launchers only start the engine of the plugin version you apply, so a plugin upgrade rarely needs a
 reinstall; Bridge warns when a launcher is out of date. The Windows launcher is not yet covered by CI.
 
-Upgrading from 0.1.0, which used `ai-hook.py`: after installing the launchers, run `./gradlew spotlessBridgeStart`
-once so the project switches to the new engine, point your AI hook at `spotless-bridge`, and delete `ai-hook.py`.
+Upgrading from 0.1.0, which used `ai-hook.py`: install the launchers as above, point your AI hook at
+`spotless-bridge`, and delete `ai-hook.py`. The next hook call prepares the new engine through Gradle once.
 
 ### 3. Connect your AI tool
 

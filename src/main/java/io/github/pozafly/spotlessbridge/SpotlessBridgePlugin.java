@@ -90,6 +90,9 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
                     for (String name : LAUNCHERS) Files.write(directory.resolve(name), resource(name));
                     Files.write(directory.resolve("LICENSE"), resource("LICENSE"));
                     directory.resolve(LAUNCHERS.get(0)).toFile().setExecutable(true);
+                    // The recorded client may belong to an older engine (0.1.0 does not accept --hook).
+                    // Without it, the next hook call prepares this plugin's engine through Gradle once.
+                    Files.deleteIfExists(project.getProjectDir().toPath().resolve(".gradle/spotless-bridge/client-runtime.txt"));
                     project.getLogger().lifecycle("Spotless Bridge: installed hook launchers in {}", directory);
                     if (Files.exists(directory.resolve(LEGACY_SCRIPT)))
                         project.getLogger().warn("Spotless Bridge: {} is no longer used. Point your AI hook at {} and delete it.",
