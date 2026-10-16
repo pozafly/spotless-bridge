@@ -149,13 +149,13 @@ public final class SharedDaemon {
                                         .toString(),
                                 "-Xmx128m",
                                 "-cp",
-                                jar.toString(),
+                                root.relativize(jar).toString(),
                                 SharedDaemon.class.getName(),
-                                root.toString(),
-                                engine.toString(),
+                                ".",
+                                root.relativize(engine).toString(),
                                 engineId,
-                                launch.toString(),
-                                snapshot.toString(),
+                                root.relativize(launch).toString(),
+                                root.relativize(snapshot).toString(),
                                 key,
                                 System.getProperty("spotlessBridge.idleSeconds", "1800"))
                         .directory(root.toFile())
@@ -420,7 +420,7 @@ public final class SharedDaemon {
      * @throws Exception if server setup, snapshot loading, or server operation fails
      */
     public static void main(String[] args) throws Exception {
-        Path root = Path.of(args[0]), engine = Path.of(args[1]);
+        Path root = Path.of(args[0]).toRealPath(), engine = Path.of(args[1]).toRealPath();
         Path state = state(root), endpointPath = state.resolve("endpoint.properties");
         String token = Files.readString(Path.of(args[3]));
         Files.delete(Path.of(args[3]));
@@ -428,7 +428,7 @@ public final class SharedDaemon {
         endpoint.setProperty("root", root.toString());
         endpoint.setProperty("engine", args[2]);
         endpoint.setProperty("token", token);
-        endpoint.setProperty("snapshot", args[4]);
+        endpoint.setProperty("snapshot", Path.of(args[4]).toRealPath().toString());
         endpoint.setProperty("key", args[5]);
         endpoint.setProperty("protocol", PROTOCOL);
         endpoint.setProperty("nativeApply", "2");

@@ -62,9 +62,10 @@ public final class WorkerClient implements AutoCloseable {
                             javaExecutable.toString(),
                             "-Xmx256m",
                             "-cp",
-                            engineDirectory.resolve("lib/*").toString(),
+                            "lib/*",
                             "io.github.pozafly.spotlessbridge.Worker",
-                            snapshotDirectory.toString())
+                            snapshotDirectory.toUri().toASCIIString())
+                    .directory(engineDirectory.toFile())
                     .redirectError(ProcessBuilder.Redirect.appendTo(errorLog.toFile()))
                     .start();
             session = new Session(process);
