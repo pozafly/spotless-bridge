@@ -6,6 +6,14 @@
 set -eu
 [ "$#" -gt 0 ] || exit 0
 root=$(cd "$(dirname "$0")/../.." && pwd -P)
+# The supported platform binary is installed by Gradle; no Node/Python/Rust installation is needed.
+if [ -f "$root/.gradle/spotless-bridge/native-client.txt" ]; then
+    IFS= read -r native < "$root/.gradle/spotless-bridge/native-client.txt"
+    native="$root/.gradle/spotless-bridge/$native"
+    if [ -x "$native" ]; then
+        exec "$native" --root "$root" apply -- "$@"
+    fi
+fi
 runtime="$root/.gradle/spotless-bridge/client-runtime.txt"
 jar=$( [ -f "$runtime" ] && sed -n 1p "$runtime" || true)
 java_home=$( [ -f "$runtime" ] && sed -n 2p "$runtime" || true)

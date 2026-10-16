@@ -6,6 +6,10 @@ rem Files are relative to the Gradle root or absolute. Formatting logic lives in
 setlocal
 if "%~1"=="" exit /b 0
 for %%R in ("%~dp0..\..") do set "BRIDGE_ROOT=%%~fR"
+set "BRIDGE_NATIVE="
+if exist "%BRIDGE_ROOT%\.gradle\spotless-bridge\native-client.txt" set /p BRIDGE_NATIVE=<"%BRIDGE_ROOT%\.gradle\spotless-bridge\native-client.txt"
+if defined BRIDGE_NATIVE set "BRIDGE_NATIVE=%BRIDGE_ROOT%\.gradle\spotless-bridge\%BRIDGE_NATIVE%"
+if defined BRIDGE_NATIVE if exist "%BRIDGE_NATIVE%" goto native
 set "BRIDGE_RUNTIME=%BRIDGE_ROOT%\.gradle\spotless-bridge\client-runtime.txt"
 call :read
 if exist "%BRIDGE_JAR%" if exist "%BRIDGE_JAVA%\bin\java.exe" goto run
@@ -20,6 +24,10 @@ popd
 call :read
 :run
 "%BRIDGE_JAVA%\bin\java.exe" -cp "%BRIDGE_JAR%" io.github.pozafly.spotlessbridge.GradleFormatter --hook "%BRIDGE_ROOT%" %*
+exit /b %ERRORLEVEL%
+
+:native
+"%BRIDGE_NATIVE%" --root "%BRIDGE_ROOT%" apply -- %*
 exit /b %ERRORLEVEL%
 
 :read

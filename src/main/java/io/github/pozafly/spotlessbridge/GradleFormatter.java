@@ -54,21 +54,19 @@ public final class GradleFormatter implements AutoCloseable {
     public synchronized String format(Path file, String source) throws IOException {
         if (closed) throw new IOException("Formatter is stopped");
         Path canonical = file.toFile().getCanonicalFile().toPath();
-        Properties endpoint = prepare(canonical);
+        Properties endpoint = prepare(List.of(canonical));
         if (!metadata.containsKey("target." + canonical)) {
             // A path requested before its first save must not become a cached exclusion.
             if (Files.isRegularFile(canonical)) excluded.add(canonical);
             return source;
         }
-        fingerprint = fingerprint();
         String formatted = SharedDaemon.format(endpoint, canonical, source);
         if (closed || (fingerprint != null && !fingerprint.equals(fingerprint())))
             throw new IOException("Spotless configuration changed while formatting. Save the file again.");
         return formatted;
     }
 
-    private Properties prepare(Path canonical) throws IOException {
-        String current = fingerprint();
+    private Properties prepare(List<Path> files) throws IOException {
         Properties endpoint = null;
         try {
             endpoint = SharedDaemon.endpoint(root);
@@ -77,10 +75,15 @@ public final class GradleFormatter implements AutoCloseable {
             if (metadata == null || !metadata.getProperty("fingerprint").equals(latest.getProperty("fingerprint")))
                 excluded.clear();
             metadata = latest;
-            boolean unknown = !metadata.containsKey("target." + canonical) && !excluded.contains(canonical);
-            boolean changed = !metadata.getProperty("fingerprint").equals(fingerprint(root, watchedRoots, List.of()))
+            // Load the snapshot's watch roots first, then hash once for the entire request.
+            String shared = fingerprint(root, watchedRoots, List.of());
+            String current = extraWatch.isEmpty() ? shared : fingerprint();
+            boolean unknown = files.stream().anyMatch(file ->
+                    !metadata.containsKey("target." + file) && !excluded.contains(file));
+            boolean changed = !metadata.getProperty("fingerprint").equals(shared)
                     || (fingerprint != null && !current.equals(fingerprint));
             if (unknown || changed || SharedDaemon.status(root) < 0) endpoint = null;
+            else fingerprint = current;
         } catch (IOException unavailable) {
             endpoint = null;
         }
@@ -150,9 +153,12 @@ public final class GradleFormatter implements AutoCloseable {
     private static void format(Path root, Path list) throws Exception {
         try (GradleFormatter client =
                 new GradleFormatter(root, Path.of(System.getProperty("java.home")), List.of(), () -> {})) {
-            for (String path : Files.readAllLines(list, StandardCharsets.UTF_8)) {
-                if (!path.isBlank()) client.prepare(root.resolve(path).toRealPath());
-            }
+            List<Path> files = new ArrayList<>();
+            for (String path : Files.readAllLines(list, StandardCharsets.UTF_8))
+                if (!path.isBlank()) files.add(root.resolve(path).toRealPath());
+            if (files.isEmpty()) return;
+            // One Gradle refresh discovers every new target, including batches containing excluded files.
+            client.prepare(files);
             SharedDaemon.apply(root, list);
         }
     }
