@@ -11,9 +11,12 @@ if exist "%BRIDGE_ROOT%\.gradle\spotless-bridge\native-client.txt" set /p BRIDGE
 if defined BRIDGE_NATIVE set "BRIDGE_NATIVE=%BRIDGE_ROOT%\.gradle\spotless-bridge\%BRIDGE_NATIVE%"
 if defined BRIDGE_NATIVE if exist "%BRIDGE_NATIVE%" goto native
 set "BRIDGE_RUNTIME=%BRIDGE_ROOT%\.gradle\spotless-bridge\client-runtime.txt"
+rem A missing installed native client is restored by Gradle before handling Unicode file arguments.
+if defined BRIDGE_NATIVE goto prepare
 call :read
 if exist "%BRIDGE_JAR%" if exist "%BRIDGE_JAVA%\bin\java.exe" goto run
 rem First use, or the engine was removed with part of .gradle: Gradle prepares the project's engine again.
+:prepare
 pushd "%BRIDGE_ROOT%" || exit /b 1
 call gradlew.bat --console=plain --no-configuration-cache spotlessBridgeStart
 if errorlevel 1 (
@@ -21,6 +24,9 @@ if errorlevel 1 (
     exit /b 1
 )
 popd
+if exist "%BRIDGE_ROOT%\.gradle\spotless-bridge\native-client.txt" set /p BRIDGE_NATIVE=<"%BRIDGE_ROOT%\.gradle\spotless-bridge\native-client.txt"
+if defined BRIDGE_NATIVE set "BRIDGE_NATIVE=%BRIDGE_ROOT%\.gradle\spotless-bridge\%BRIDGE_NATIVE%"
+if defined BRIDGE_NATIVE if exist "%BRIDGE_NATIVE%" goto native
 call :read
 :run
 "%BRIDGE_JAVA%\bin\java.exe" -cp "%BRIDGE_JAR%" io.github.pozafly.spotlessbridge.GradleFormatter --hook "%BRIDGE_ROOT%" %*

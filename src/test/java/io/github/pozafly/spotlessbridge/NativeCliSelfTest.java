@@ -19,6 +19,7 @@ public final class NativeCliSelfTest {
         Files.createDirectories(wrapper);
         Files.copy(Path.of("gradle/wrapper/gradle-wrapper.jar"), wrapper.resolve("gradle-wrapper.jar"));
         Files.copy(Path.of("gradle/wrapper/gradle-wrapper.properties"), wrapper.resolve("gradle-wrapper.properties"));
+        Files.copy(Path.of("gradlew.bat"), root.resolve("gradlew.bat"));
         Files.writeString(root.resolve("settings.gradle"), "pluginManagement { repositories { maven { url = uri('"
                 + Path.of(args[0]).toUri() + "') }; gradlePluginPortal() } }\nrootProject.name = 'native-client-test'\n");
         String build = """
@@ -117,7 +118,7 @@ public final class NativeCliSelfTest {
             Files.delete(binary);
             Files.writeString(file, SOURCE);
             launcher(root, file);
-            check(Files.readString(file).contains("변경"), "missing native binary falls back to Java safely");
+            check(Files.readString(file).contains("변경"), "launcher recovers safely without the native binary");
             gradle(root, "help");
             check(Files.isRegularFile(binary), "Gradle restores missing native binary");
             nativeApply(root, file);
@@ -156,7 +157,7 @@ public final class NativeCliSelfTest {
     private static void launcher(Path root, Path file) throws Exception {
         List<String> command = new ArrayList<>();
         boolean windows = System.getProperty("os.name").startsWith("Windows");
-        if (windows) command.addAll(List.of("cmd.exe", "/d", "/c"));
+        if (windows) command.addAll(List.of("cmd.exe", "/d", "/c", "call"));
         command.add(root.resolve(".gradle/spotless-bridge/spotless-bridge" + (windows ? ".cmd" : "")).toString());
         command.add(file.toString());
         run(root, 0, command);
