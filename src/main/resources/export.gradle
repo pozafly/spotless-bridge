@@ -10,8 +10,27 @@ gradle.projectsEvaluated {
             def targets = [:].withDefault { [] }
             int count = 0
             root.allprojects.sort { it.path }.each { project ->
-                def task = project.plugins.hasPlugin('com.diffplug.spotless')
-                        ? project.tasks.findByName('spotlessJava') : null
+                def spotless = project.plugins.findPlugin('com.diffplug.spotless')
+                if (spotless != null) {
+                    // Released Spotless JARs have no Implementation-Version. Inspect the loaded
+                    // plugin, including Gradle's instrumented JAR, rather than parsing build scripts.
+                    def location = spotless.class.protectionDomain.codeSource?.location
+                    def jarName = location == null ? '' : new File(location.toURI()).name
+                    def match = jarName =~ /(?:instrumented-)?spotless-plugin-gradle-(.+)\.jar/
+                    def version = match.matches() ? match.group(1) : null
+                    if (version == null || !(version ==~ /8\.\d+\.\d+(?:[-+].*)?/)) {
+                        def detected = version == null ? "unknown (loaded from ${location})" : version
+                        throw new GradleException("Spotless Bridge does not support Spotless ${detected} in project ${project.path}. "
+                                + 'Supported Spotless range: >= 8.0.0 and < 9.0.0. '
+                                + 'Use a supported Spotless plugin version or update Spotless Bridge. '
+                                + 'You can run the project spotlessApply task without Bridge.')
+                    }
+                    if (!(version in ['8.0.0', '8.10.2'])) {
+                        project.logger.warn("Spotless Bridge: Spotless ${version} in project ${project.path} is within the supported range but has not been verified. "
+                                + 'Verified Spotless versions: 8.0.0, 8.10.2.')
+                    }
+                }
+                def task = spotless != null ? project.tasks.findByName('spotlessJava') : null
                 if (task != null && task.enabled) {
                     if (task.hasProperty('ratchetFrom') && task.ratchetFrom) {
                         throw new GradleException('Spotless Bridge does not yet support ratchetFrom. Use the project spotlessApply task for this configuration.')

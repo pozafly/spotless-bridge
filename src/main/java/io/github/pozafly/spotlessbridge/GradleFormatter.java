@@ -161,7 +161,6 @@ public final class GradleFormatter implements AutoCloseable {
                         "org.gradle.wrapper.GradleWrapperMain",
                         "--no-configuration-cache",
                         "--console=plain",
-                        "--quiet",
                         ":spotlessBridgeStart")
                 .directory(root.toFile())
                 .redirectErrorStream(true)
@@ -178,8 +177,15 @@ public final class GradleFormatter implements AutoCloseable {
                 process.destroyForcibly();
                 throw new IOException("Spotless Bridge 설정을 120초 안에 가져오지 못했습니다. 로그: " + log);
             }
+            String versionError = "";
+            for (String line : Files.readAllLines(log)) {
+                String message = line.strip();
+                if (message.startsWith("Spotless Bridge:")) System.err.println(message);
+                if (message.contains("Spotless Bridge does not support")) versionError = message;
+            }
             if (process.exitValue() != 0)
-                throw new IOException("Spotless Bridge 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log);
+                throw new IOException("Spotless Bridge 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log
+                        + (versionError.isEmpty() ? "" : "\n" + versionError));
         } catch (InterruptedException interrupted) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();

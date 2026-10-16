@@ -29,6 +29,9 @@ public final class FormatterSelfTest {
                 + " / JDK " + Runtime.version());
         String version = System.getProperty("spotlessBridge.testSpotlessVersion", "8.10.2");
         Path temp = Files.createTempDirectory("spotless-bridge-test-");
+        // These fixed versions exercise both sides of the policy; newer JDKs may not run old Gradle.
+        if ((javaVersion == 17 || javaVersion == 21) && gradleVersion.equals("8.14.3"))
+            versionCompatibility(temp, engine, bridgeVersion);
         Path root = temp.resolve("fixture");
         Path cache = root.resolve(".gradle/spotless-bridge/snapshots");
         Path file = root.resolve("src/main/java/Sample.java");
@@ -289,6 +292,94 @@ public final class FormatterSelfTest {
         }
     }
 
+    private static void versionCompatibility(Path temp, Path engine, String bridgeVersion) throws Exception {
+        Path oldGradle = temp.resolve("unsupported-gradle");
+        installWrapper(oldGradle, "8.13");
+        Files.writeString(oldGradle.resolve("settings.gradle"), "rootProject.name = 'unsupported-gradle'\n");
+        Path engineJar;
+        try (var jars = Files.list(engine.resolve("lib"))) {
+            engineJar = jars.filter(path -> path.toString().endsWith(".jar")).findFirst().orElseThrow();
+        }
+        // Load the built JAR directly so Gradle's publication variant check cannot mask our diagnostic.
+        Files.writeString(oldGradle.resolve("build.gradle"), """
+                buildscript { dependencies { classpath files('%s') } }
+                apply plugin: 'io.github.pozafly.spotlessbridge'
+                """.formatted(engineJar.toAbsolutePath()));
+        Path log = Files.createTempFile("spotless-bridge-version-", ".log");
+        check(runGradle(oldGradle, log, "spotlessBridgeStart") != 0, "start must reject unsupported Gradle");
+        String diagnostic = Files.readString(log);
+        check(diagnostic.contains("Spotless Bridge does not support Gradle 8.13")
+                        && diagnostic.contains("Supported Gradle range: >= 8.14.3 and < 10.0")
+                        && diagnostic.contains("update Spotless Bridge"),
+                "actionable unsupported Gradle diagnostic: " + diagnostic);
+        check(!Files.exists(oldGradle.resolve(".gradle/spotless-bridge/endpoint.properties")),
+                "unsupported Gradle must not start a daemon");
+
+        Path root = temp.resolve("version-policy");
+        installWrapper(root, "8.14.5");
+        Files.writeString(root.resolve("settings.gradle"),
+                pluginRepositories + "rootProject.name = 'version-policy'\ninclude 'child'\n");
+        Files.writeString(root.resolve("build.gradle"),
+                "plugins { id 'io.github.pozafly.spotlessbridge' version '" + bridgeVersion + "' }\n");
+        Path child = root.resolve("child");
+        Path file = child.resolve("src/main/java/Sample.java");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, SOURCE);
+        Path build = child.resolve("build.gradle");
+        String childBuild = """
+                plugins { id 'java'; id 'com.diffplug.spotless' version '%s' }
+                spotless { java { target 'src/**/*.java'; replace('marker', 'TOKEN', 'VERSION_POLICY') } }
+                """;
+        Path selected = root.resolve("files.txt");
+        Files.writeString(selected, file.toString() + "\n");
+        String apply = "-PspotlessBridgeFiles=" + selected;
+        try {
+            Files.writeString(build, childBuild.formatted("7.2.1"));
+            check(runGradle(root, log, "spotlessBridgeStart") != 0, "start must reject unsupported Spotless");
+            diagnostic = Files.readString(log);
+            check(diagnostic.contains("Spotless Bridge does not support Spotless 7.2.1 in project :child")
+                            && diagnostic.contains("Supported Spotless range: >= 8.0.0 and < 9.0.0")
+                            && diagnostic.contains("spotlessApply task without Bridge"),
+                    "actionable subproject Spotless diagnostic: " + diagnostic);
+            check(Files.readString(file).equals(SOURCE), "rejected version must not modify sources");
+            check(SharedDaemon.status(root) == -1, "rejected Spotless must not start a daemon");
+
+            Files.writeString(build, childBuild.formatted("8.1.0"));
+            check(runGradle(root, log, "spotlessBridgeApply", apply) == 0,
+                    "unverified in-range versions must format: " + Files.readString(log));
+            diagnostic = Files.readString(log);
+            check(diagnostic.contains("Gradle 8.14.5 is within the supported range but has not been verified")
+                            && diagnostic.contains("Spotless 8.1.0 in project :child is within the supported range but has not been verified"),
+                    "unverified versions must warn: " + diagnostic);
+            check(Files.readString(file).equals(SOURCE.replace("TOKEN", "VERSION_POLICY")),
+                    "warning must not prevent project formatter execution");
+            long pid = SharedDaemon.status(root);
+            check(pid > 0, "in-range versions start a daemon");
+
+            // A later downgrade must fail without applying the old daemon's cached rules.
+            Files.writeString(file, SOURCE);
+            Files.writeString(build, childBuild.formatted("7.2.1"));
+            check(runGradle(root, log, "spotlessBridgeApply", apply) != 0, "unsupported downgrade must fail");
+            check(Files.readString(file).equals(SOURCE), "unsupported downgrade must preserve source");
+            check(SharedDaemon.status(root) == pid, "rejection must not replace an existing daemon");
+            try (GradleFormatter formatter = new GradleFormatter(
+                    root, Path.of(System.getProperty("java.home")), List.of(), () -> {})) {
+                try {
+                    formatter.format(file, SOURCE);
+                    throw new AssertionError("client must reject unsupported Spotless");
+                } catch (IOException expected) {
+                    check(expected.getMessage().contains("Spotless Bridge does not support Spotless 7.2.1")
+                                    && expected.getMessage().contains("Supported Spotless range"),
+                            "IDE/hook client must expose version diagnostic: " + expected.getMessage());
+                }
+            }
+            check(Files.readString(file).equals(SOURCE), "client rejection must preserve source");
+        } finally {
+            SharedDaemon.stop(root);
+        }
+        System.out.println("PASS: version range rejection, actionable diagnostics, in-range warnings and safe downgrade");
+    }
+
     private static void kotlinDsl(
             Path temp, String version, String bridgeVersion, String gradleVersion, Path javaHome, String googleVersion)
             throws Exception {
@@ -364,15 +455,16 @@ public final class FormatterSelfTest {
     }
 
     private static int runGradle(Path root, String task) throws Exception {
-        Path log = Files.createTempFile("spotless-bridge-task-", ".log");
-        Process process = new ProcessBuilder(
-                        Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                        "-classpath",
-                        root.resolve("gradle/wrapper/gradle-wrapper.jar").toString(),
-                        "org.gradle.wrapper.GradleWrapperMain",
-                        "--quiet",
-                        "--no-configuration-cache",
-                        task)
+        return runGradle(root, Files.createTempFile("spotless-bridge-task-", ".log"), task);
+    }
+
+    private static int runGradle(Path root, Path log, String... tasks) throws Exception {
+        List<String> command = new ArrayList<>(List.of(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-classpath", root.resolve("gradle/wrapper/gradle-wrapper.jar").toString(),
+                "org.gradle.wrapper.GradleWrapperMain", "--console=plain", "--no-configuration-cache"));
+        command.addAll(List.of(tasks));
+        Process process = new ProcessBuilder(command)
                 .directory(root.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(log.toFile())
@@ -381,7 +473,7 @@ public final class FormatterSelfTest {
             process.destroyForcibly();
             throw new AssertionError("Gradle task timeout: " + log);
         }
-        System.out.println("Task " + task + ": exit=" + process.exitValue() + " log=" + log);
+        System.out.println("Task " + String.join(" ", tasks) + ": exit=" + process.exitValue() + " log=" + log);
         return process.exitValue();
     }
 
