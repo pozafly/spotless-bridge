@@ -2,30 +2,128 @@
 
 English | [한국어](README.ko.md)
 
-A persistent Java formatter that uses your project's existing Spotless configuration and libraries.
-**IntelliJ and AI hooks share one daemon per Gradle project.** Hooks can start and reuse it while
-IntelliJ is closed. No global installation or operating system service is required.
+**Format the Java files your AI coding tool changes, and the files you save in IntelliJ, with your project's own Spotless rules, without waiting for Gradle every time.**
 
-**Status:** `0.1.0` is being prepared as the first public release. It has not been published to the Gradle Plugin Portal
-or JetBrains Marketplace. There is no public release/tag for this version yet; use the local
-installation below with a source checkout containing these changes.
+Spotless Bridge keeps your project's Spotless formatter warm in a small background daemon.
+AI hooks and the IntelliJ plugin send files to that daemon instead of running `spotlessApply`,
+so repeated formatting skips Gradle configuration and formatter startup.
 
-## Requirements and support
+Formatting rules and versions come from your existing `spotless { java { ... } }` configuration.
+There is no separate editor style to maintain and no global service to install.
 
-- JDK 21 or a verified newer runtime from the compatibility table, and the consuming project's Gradle wrapper.
-- Python 3 for the recommended AI hook; it uses only the standard library.
-- Automated tests cover Palantir, Google, and Eclipse formatters; see the compatibility table for Gradle and Spotless versions.
-- Local verification has used macOS. The CI workflow targets Linux; Windows is not verified.
-- Java whole-file formatting only. Maven, other languages, and range formatting are not supported.
-- Gradle configuration cache and isolated projects are explicitly declared unsupported.
+> [!NOTE]
+> The IntelliJ plugin isn't on JetBrains Marketplace yet. It will be published there later;
+> see [IntelliJ IDEA (preview)](#intellij-idea-preview) for how to try it now.
 
-Spotless Bridge does not select your Spotless or formatter versions. Keep them in your own build.
+## Quick start
 
-## Verified compatibility
+You need a Gradle project with Spotless Java formatting configured, its Gradle wrapper,
+**JDK 21 or newer** to run Gradle, and **Python 3** for the AI hook.
 
-Bridge 0.1.0 requires **JDK 21 or newer**. These consumer runtime combinations are tested:
+### 1. Apply the plugin
 
-| Consumer JDK | Consumer Gradle | Spotless verification |
+Add Spotless Bridge to the `plugins` block of your **root** `build.gradle`, next to Spotless:
+
+```groovy
+plugins {
+    id 'com.diffplug.spotless' version '8.10.2'   // your existing Spotless
+    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
+}
+```
+
+In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.0"`.
+Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
+and leave each module's Spotless configuration as it is.
+
+### 2. Add the hook script
+
+From your project's Gradle root, download the hook script and its license for the same version:
+
+```sh
+bridge_version=0.1.0
+mkdir -p tools/spotless-bridge
+curl -fsSL -o tools/spotless-bridge/ai-hook.py \
+  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/scripts/ai-hook.py"
+curl -fsSL -o tools/spotless-bridge/LICENSE \
+  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/LICENSE"
+```
+
+Commit both files. When you upgrade the plugin, download the script for the new version too.
+
+### 3. Connect your AI tool
+
+Have your AI tool run the script after it edits Java files, passing the Gradle root and the changed files:
+
+```sh
+JAVA_HOME=/path/to/jdk21 python3 tools/spotless-bridge/ai-hook.py "$PWD" \
+  src/main/java/example/Customer.java \
+  src/test/java/example/CustomerTest.java
+```
+
+For example, in Claude Code you can add a `PostToolUse` hook to `.claude/settings.json`.
+It formats each Java file right after Claude edits it. This example uses `jq` to read the edited path
+and assumes the Claude Code project directory is the Gradle root:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 python3 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/ai-hook.py\" \"$CLAUDE_PROJECT_DIR\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Other AI tools work the same way: collect the Java files the task changed and pass them to the script.
+That's it. The first request starts the daemon, and later requests reuse it.
+
+## How it works
+
+```text
+Your Gradle project's Spotless configuration
+                    |
+                    v
+          Project formatting daemon
+             /                \
+            /                  \
+   IntelliJ plugin          AI hook
+   Reformat / Save          Changed files
+```
+
+1. The first request runs the project's Gradle wrapper to read the Spotless configuration and start the daemon.
+2. While the configuration is unchanged, later requests for known target files go straight to the daemon without Gradle.
+3. If the configuration changes, a file isn't a known target, or the daemon isn't running, Gradle starts or refreshes it.
+
+A few terms used in this document:
+
+- **Engine**: the Spotless Bridge plugin JAR, copied into `.gradle/spotless-bridge/` so the daemon and hooks can run it
+  outside Gradle. Its version is the plugin version you apply.
+- **Daemon**: one background process per Gradle root. It is separate from both IntelliJ and the Gradle daemon,
+  so it keeps serving hooks after you close the IDE.
+- **Worker**: the process the daemon runs to load your project's Spotless formatter and keep it in memory.
+
+Because each Gradle root has its own daemon, every project keeps its own formatter versions and rules.
+The daemon shuts down after 30 minutes without requests and starts again on the next one.
+
+## Requirements and compatibility
+
+- Gradle must run on **JDK 21 or newer**: the JDK in `JAVA_HOME` when you call `./gradlew` or the hook.
+- Bridge formats **whole Java files in Gradle projects**. Maven support is in progress; other languages are not supported.
+- Not supported: Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, and non-serializable formatting steps.
+  Run Bridge tasks with `--no-configuration-cache` if your build enables the configuration cache.
+- Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
+
+Bridge 0.1.0 is tested with these combinations:
+
+| JDK | Gradle | Spotless verification |
 | --- | --- | --- |
 | 21 | 8.14.3 | 8.10.2 full regression suite; 8.0.0 version-switch and output-parity check |
 | 21 | 8.14.6 | Same checks |
@@ -33,235 +131,112 @@ Bridge 0.1.0 requires **JDK 21 or newer**. These consumer runtime combinations a
 | 21 | 9.8.1 | Same checks |
 | 25 | 9.8.1 | Same checks |
 
-These are tested combinations, not a guarantee for every JDK, Gradle 8.x/9.x, or Spotless version.
-The suite covers Groovy/Kotlin DSL, native Spotless output parity, new and excluded files,
-configuration refresh, shared daemon reuse, concurrent requests, and hooks running without an IDE.
-Configuration cache and isolated projects remain unsupported.
+Other versions may work, but these are the only combinations tested. JDK 25 has not been tested with
+Gradle 8.x or 9.0.0. The suite covers Groovy and Kotlin DSL, output parity with plain Spotless,
+new and excluded files, configuration refresh, shared daemon reuse, concurrent requests, and hooks
+running without an IDE.
 
-Bridge is built with **JDK 21** and the checked-in Gradle 8.14.3 wrapper. The tests run the same
-Java 21-targeted engine on the selected consumer JDK, including Gradle, the daemon, workers, and hooks.
-The Ubuntu CI matrix keeps the four JDK 21 combinations and adds JDK 25 with Gradle 9.8.1.
-The JDK 25 combination was also verified locally on macOS with Temurin 25.0.4.1.
-JDK 25 is not a tested combination with Gradle 8.x or 9.0.0.
-See the IntelliJ section for its separate supported build range.
+## More on the AI hook
 
-## Project setup
+- The first argument is the Gradle root; each remaining argument is a file to format.
+  Paths can be absolute or relative to the Gradle root. If the hook runs from another directory,
+  use absolute paths for both the script and the Gradle root.
+- Pass only existing files; leave out deleted ones. With no file arguments, the script does nothing.
+- Treat a nonzero exit code as a hook failure.
+- The first call prepares the engine through Gradle. Later calls start the engine's Java client directly,
+  so known target files are formatted without Gradle while the configuration is unchanged.
+- IntelliJ doesn't need to be installed or running.
 
-Apply Spotless Bridge once in the root `build.gradle`. Keep each module's existing Spotless configuration.
-The following formatter versions and rules are examples:
+After formatting, keep running your project's usual checks: `spotlessCheck`, compilation, and relevant tests.
+If you use OpenRewrite, run it before Bridge so the rewritten code gets formatted.
 
-```groovy
-plugins {
-    id 'java'
-    id 'com.diffplug.spotless' version '8.10.2'
-    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
-}
-repositories { mavenCentral() }
-spotless {
-    java {
-        shortenFullyQualifiedTypes()
-        removeUnusedImports()
-        palantirJavaFormat('2.97.0')
-    }
-}
+### Use a Gradle task instead
+
+If your scripts already run Gradle, you can call the apply task directly. Create a UTF-8 file with
+one target path per line, absolute or relative to the Gradle root:
+
+```text
+src/main/java/example/Customer.java
+src/test/java/example/CustomerTest.java
 ```
 
-For Kotlin DSL, use `id("io.github.pozafly.spotlessbridge") version "0.1.0"` in `plugins`.
-
-### Local installation before publication
-
-In this source checkout, run with JDK 21:
-
-```sh
-./gradlew publishAllPublicationsToTestRepository
-```
-
-This writes the implementation JAR and plugin marker to `build/repository` only. It does not publish
-to the Portal or install into a global Maven repository. Add this local path to the consuming
-project's `settings.gradle`, before other blocks:
-
-```groovy
-pluginManagement {
-    repositories {
-        maven { url = uri('/path/to/spotless-bridge/build/repository') }
-        gradlePluginPortal()
-    }
-}
-```
-
-Use double quotes instead of single quotes in `settings.gradle.kts`. Replace the path with the
-actual source checkout location. After Portal publication, the local Maven entry can be removed.
-Public repositories cannot resolve `0.1.0` yet.
-
-## Install the AI hook in your project
-
-The Gradle plugin does **not** automatically copy the Python hook into your project.
-For now, copy it from the local source checkout containing these changes.
-
-After public releases are available, download the source archive for the `v<version>` release
-matching your Gradle plugin version from the [repository's releases](https://github.com/pozafly/spotless-bridge/releases).
-For example, plugin `0.1.0` should use source tag `v0.1.0`. That release/tag does not exist yet.
-Use a fixed release rather than the moving `main` branch.
-
-From your consuming project's Gradle root, copy the script and its license:
-
-```sh
-bridge_source=/path/to/spotless-bridge
-mkdir -p tools/spotless-bridge
-cp "$bridge_source/scripts/ai-hook.py" tools/spotless-bridge/ai-hook.py
-cp "$bridge_source/LICENSE" tools/spotless-bridge/LICENSE
-```
-
-Commit these two copied files in the consuming project. Keep the license next to the script;
-do not replace your project's own license. No `pip` installation is needed.
-
-Configure your AI tool's completion hook to run the following command from the Gradle root,
-passing each existing changed Java file as a separate argument:
-
-```sh
-export JAVA_HOME=/path/to/jdk21
-python3 tools/spotless-bridge/ai-hook.py "$PWD" src/main/java/Changed.java
-```
-
-Replace the JDK path and file list with your actual values. Quote paths containing spaces or commas.
-From another working directory, use absolute paths for the script and Gradle root. File arguments
-may be absolute or relative to the Gradle root.
-
-The caller supplies the changed-file list; the script does not discover changes. No file arguments
-means a successful no-op, not whole-project formatting. Exclude deleted files: nonexistent paths fail.
-Propagate a nonzero exit code as a failed hook. Update the copied script together with the Gradle
-plugin version when upgrading.
-
-On first use, the hook runs Gradle to install the project-selected engine. Later calls read
-`.gradle/spotless-bridge/client-runtime.txt` and invoke the Java client directly. Files already registered
-as Spotless targets reuse a running daemon without Gradle when configuration is unchanged. A missing
-daemon, configuration change, or unknown target triggers Gradle startup or refresh. Excluded files are
-left unchanged, but passing them to repeated hook invocations currently reevaluates Gradle each time.
-IntelliJ does not need to be running.
-
-You can also use Gradle directly. Create a UTF-8 text file containing one path per line, relative
-to the Gradle root or absolute:
+Then pass that file to the apply task:
 
 ```sh
 ./gradlew --no-configuration-cache spotlessBridgeApply -PspotlessBridgeFiles=/path/to/changed-files.txt
 ```
 
-This evaluates Gradle on every invocation. Omitting the file-list property fails instead of applying
-to all sources. For frequent hooks, prefer the installed Python script.
+This approach evaluates Gradle on every run, so prefer the Python script for frequent hooks.
 
-If you also use OpenRewrite, run it before formatting, then run `spotlessCheck`, compilation, and
-the tests required by your project. A successful formatter invocation does not prove tests passed.
+## IntelliJ IDEA (preview)
 
-## IntelliJ adapter
+The IntelliJ plugin applies your Spotless rules when you run **Reformat Code** or save a Java file.
+It uses the same daemon as your AI hook. It will be published to JetBrains Marketplace later; until then,
+[build and install it from source](docs/install-from-source.md#3-build-and-install-the-intellij-plugin).
+AI hooks work without the IntelliJ plugin.
 
-Build the adapter with JDK 21 and an IntelliJ SDK:
+After installing it:
 
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew clean build pluginZip
-```
+1. Open **Settings → Tools → Spotless Bridge**, enable the plugin, and set the JDK 21 path.
+2. If needed, set the Gradle root. Use the same root as your AI hook.
+3. Run **Reformat Code** on a Java source file to format it with your Spotless rules.
+4. To format on save, enable **Tools → Actions on Save → Reformat code** with **Java / Whole file**.
+   Disable overlapping Java formatters and the Optimize imports, Rearrange code, and Code cleanup
+   save actions so they don't modify the result afterward.
 
-The plugin descriptor permits IntelliJ IDEA builds from `262.10968` through `262.*`; earlier 262
-builds are not included. The ZIP build currently expects the macOS application layout; override the
-application path with `-PideaHome=/path/to/IntelliJ/Contents` if needed. The SDK is not needed for
-the Gradle plugin or headless checks.
+The plugin formats writable local Java files that IntelliJ recognizes as source. Selection-only
+formatting isn't supported. IntelliJ receives text with LF line endings; files written by hooks
+follow the project's Spotless encoding and line-ending settings.
 
-`build/distributions/spotless-bridge-0.1.0.zip` contains only the IDE adapter. The consuming project's
-Gradle plugin selects the daemon engine version.
+## Configuration changes
 
-1. Disable or uninstall the previous development plugin before installing this ZIP.
-2. Open Settings → Plugins → gear menu → Install Plugin from Disk… and select the ZIP.
-3. Open Settings → Tools → Spotless Bridge, enable it, and specify JDK 21.
-4. Set the Gradle root and additional watched paths if necessary.
-5. Under Tools → Actions on Save → Reformat code, select Java / Whole file.
-   Disable overlapping Java formatters and Optimize imports, Rearrange code, and Code cleanup.
+- Changes to build scripts, Gradle configuration, wrapper files, and formatting configuration such as
+  `.editorconfig` are detected automatically. If you change environment variables or inputs outside the
+  watched paths, run `spotlessBridgeStart` to refresh explicitly. Extra watch paths configured in IntelliJ
+  apply only to that IDE client.
+- Use the same Gradle properties and environment for IDE and hook requests. Clients of the same
+  Gradle root share the most recently refreshed configuration.
+- Excluded files are left unchanged. Files that aren't known targets trigger Gradle evaluation, and
+  passing excluded files repeatedly triggers it every time, so pass only the Java files you intend to format.
+  To format generated files, run source generation first.
 
-The renamed plugin has a new plugin ID and settings storage name; reapply settings when replacing
-the older development build. Do not enable both adapters together.
+## Troubleshooting
 
-The IDE adapter only accepts writable local Java files that IntelliJ recognizes as source content.
-A Java file outside those source roots can be a Spotless target for the hook while remaining ineligible
-for IDE formatting. The adapter skips quick-format and whitespace-only requests.
-
-Reformat Code and format-on-save send document contents to the daemon and apply results only if the
-document is still current. IDE results use LF; disk formatting through hooks follows Spotless's encoding
-and line-ending policy. Closing the IDE or disabling the adapter closes its connection, not the daemon.
-
-## Daemon lifecycle
-
-One daemon belongs to each canonical Gradle root. It owns one worker using that project's formatter
-libraries. IDE and hook requests share both processes and are handled sequentially.
-
-- Unchanged configuration reuses the daemon and worker.
-- Changed settings or targets replace the worker inside the same daemon.
-- Changed engine JAR or execution JDK replaces the daemon too.
-- Gradle tasks export configuration directly; the daemon does not recursively invoke Gradle.
+You normally don't need to manage the daemon. To check it, run these from your project's Gradle root:
 
 ```sh
-./gradlew spotlessBridgeStart    # Start or refresh with current settings
-./gradlew spotlessBridgeStatus   # PID, or -1 when not running
-./gradlew spotlessBridgeStop     # Explicit shutdown
+./gradlew --no-configuration-cache spotlessBridgeStatus
+./gradlew --no-configuration-cache spotlessBridgeStart
+./gradlew --no-configuration-cache spotlessBridgeStop
 ```
 
-The daemon and worker exit after 30 idle minutes. File locks coordinate concurrent startup; stale
-connection information is replaced on the next startup. Communication uses loopback TCP and a
-project-specific authentication token, not a public network listener.
+`spotlessBridgeStatus` prints `Spotless Bridge pid=<number>`; `-1` means no daemon is running.
+To confirm that IntelliJ and your hook share a daemon, format a file from each and check that the PID stays the same.
 
-State and logs live under `.gradle/spotless-bridge/`: `endpoint.properties`, `daemon.log`, `worker.log`,
-`gradle-start-*.log`, `client-runtime.txt`, `snapshots/`, and `runtime/`. Do not commit this directory.
-Run `spotlessBridgeStop` before deleting it.
+Runtime files and logs are stored in your project's `.gradle/spotless-bridge/`; keep this directory out of Git.
+If a request fails, check `daemon.log`, `worker.log`, and `gradle-start-*.log` there.
+Stop the daemon before deleting the directory.
 
-## Change detection and limitations
+Concurrent requests from the IDE and hooks are processed one at a time. A configuration change refreshes
+the formatter worker; a change to the engine or the JDK also replaces the daemon.
 
-The client watches build scripts, Gradle properties and wrapper files, `gradle/`, `buildSrc/`,
-`build-logic/`, TOML, `.editorconfig`, `.gitattributes`, included builds, external projects, Gradle user
-home initialization files. Additional watch paths configured in IntelliJ apply only to that IDE client;
-they are not shared with the hook. When a hook depends on an input outside its watched paths, run
-`spotlessBridgeStart` explicitly after changing that input. Missing files are not cached as excluded,
-so a newly saved file can be evaluated again.
+## Why Spotless Bridge?
 
-Not every Gradle input can be tracked, including environment variables and remote data. Refresh
-explicitly with `spotlessBridgeStart` when such inputs change. Tools using different `-P` options
-share the most recently refreshed configuration; align properties and environments for one project.
+I wanted Spotless to run whenever I saved a file in IntelliJ or an AI tool generated code. But calling
+`spotlessApply` each time meant waiting for Gradle configuration and task execution, even for a single
+file and even with a warm Gradle daemon.
 
-- Spotless internal APIs and serialization are used. Arbitrary versions or custom steps may fail.
-- `ratchetFrom` and non-serializable steps are unsupported. Failures do not silently reuse old settings.
-- Configuration evaluation has a 120-second timeout, worker formatting 15 seconds, and TCP response
-  waiting 30 seconds. UTF-8 messages are limited to 16 MiB.
-- Hooks fail before writing when detected file/configuration changes invalidate the result. Atomic
-  locking against external editors is not guaranteed.
-- Run source-generation tasks first for generated sources outside the default discovery policy.
-- Build and formatter processes are not sandboxed; use trusted project builds.
+Frontend tooling handles this with long-running processes: TypeScript's
+[tsserver](https://github.com/microsoft/TypeScript/wiki/Standalone-Server-%28tsserver%29) stays up to
+answer editor requests, and the [Prettier VS Code extension](https://github.com/prettier/prettier-vscode)
+loads the project's own Prettier. Spotless Bridge applies the same idea to Spotless: it **spends a little
+memory to keep the formatter ready instead of waiting for it on every edit**, while the rules stay in
+your project's Spotless configuration. Keep running `spotlessCheck` in your build or CI to verify formatting.
 
-## Development and verification
+## Contributing
 
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist
-```
-
-To run the same suite against a different consumer Gradle version (the default is `8.14.3`):
-
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
-```
-
-To keep compilation on JDK 21 and run the entire compatibility suite on JDK 25:
-
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
-  -PtestGradleVersion=9.8.1 -PtestJavaHome=/path/to/jdk25
-```
-
-`testJavaHome` defaults to the build JVM's home. It also sets `JAVA_HOME` for hook bootstrap;
-it does not change your system default Java or the engine's minimum runtime version.
-
-`check` publishes to a local file repository and tests the actual plugin in isolated consumer builds.
-It covers Groovy/Kotlin DSL, multiple modules, formatter parity, new/excluded files, configuration
-changes and recovery, shared daemon reuse, concurrent requests, restart/shutdown, project-local hook
-installation, and zero Gradle invocations for repeated hooks on registered targets with unchanged configuration.
-
-`gradle.properties` owns the plugin version. Tests receive that version from Gradle rather than
-hardcoding it. Real IDE UI behavior, Plugin Verifier, and Marketplace review are separate checks.
-Normal builds and tests do not publish publicly. See the [maintainer notes (Korean)](docs/maintenance.md).
+To build Bridge from source, run its tests, or try unreleased changes, see [Install from source](docs/install-from-source.md).
+Implementation and release notes are in the [maintainer notes (Korean)](docs/maintenance.md).
 
 ## License
 

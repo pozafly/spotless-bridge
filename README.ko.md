@@ -2,17 +2,128 @@
 
 [English](README.md) | 한국어
 
-프로젝트의 Spotless 설정과 라이브러리를 그대로 사용하는 상주 Java 포매터입니다.
-**IntelliJ와 AI hook이 Gradle 프로젝트별 공용 daemon을 사용합니다.** IDE가 꺼져 있어도
-hook이 daemon을 시작하고 재사용합니다. 전역 설치나 OS 시작 서비스는 필요하지 않습니다.
+**AI 코딩 도구가 수정한 Java 파일과 IntelliJ에서 저장한 파일을, 매번 Gradle을 기다리지 않고 프로젝트의 Spotless 규칙으로 포맷합니다.**
 
-첫 공개 배포 버전은 **0.1.0으로 준비 중**이며 Gradle Plugin Portal·JetBrains Marketplace에는 아직 게시하지 않았습니다.
+Spotless Bridge는 프로젝트의 Spotless 포매터를 작은 백그라운드 daemon에 띄워 둡니다.
+AI hook과 IntelliJ 플러그인은 `spotlessApply`를 실행하는 대신 이 daemon에 파일을 보내므로,
+반복해서 포맷할 때 Gradle 설정 평가와 포매터 초기화를 건너뜁니다.
 
-## 검증한 호환 조합
+규칙과 포매터 버전은 기존 `spotless { java { ... } }` 설정을 그대로 따릅니다.
+IDE 포맷 규칙을 따로 맞추거나 전역 서비스를 설치할 필요가 없습니다.
 
-Bridge 0.1.0의 최소 실행 버전은 **JDK 21**이며, 다음 소비 프로젝트 실행 조합으로 검증합니다.
+> [!NOTE]
+> IntelliJ 플러그인은 아직 JetBrains Marketplace에 배포되지 않았으며, 추후 배포할 예정입니다.
+> 지금 사용해 보려면 [IntelliJ IDEA (미리보기)](#intellij-idea-미리보기)를 참고하세요.
 
-| 소비 프로젝트 JDK | 소비 프로젝트 Gradle | Spotless 검증 범위 |
+## 빠른 시작
+
+Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 Gradle wrapper가 필요합니다.
+Gradle을 실행할 **JDK 21 이상**, AI hook에 사용할 **Python 3**도 준비하세요.
+
+### 1. 플러그인 적용
+
+**루트** `build.gradle`의 `plugins` 블록에 Spotless와 함께 Spotless Bridge를 추가합니다.
+
+```groovy
+plugins {
+    id 'com.diffplug.spotless' version '8.10.2'   // 기존 Spotless
+    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
+}
+```
+
+Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.0"`을 추가합니다.
+기존 Spotless 버전과 규칙은 그대로 두세요. 다중 프로젝트 빌드에서는 Bridge를 루트에 한 번만 적용하고,
+각 모듈의 Spotless 설정은 그대로 둡니다.
+
+### 2. hook 스크립트 추가
+
+프로젝트의 Gradle 루트에서 플러그인과 같은 버전의 hook 스크립트와 라이선스를 내려받습니다.
+
+```sh
+bridge_version=0.1.0
+mkdir -p tools/spotless-bridge
+curl -fsSL -o tools/spotless-bridge/ai-hook.py \
+  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/scripts/ai-hook.py"
+curl -fsSL -o tools/spotless-bridge/LICENSE \
+  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/LICENSE"
+```
+
+두 파일을 프로젝트에 커밋하세요. 플러그인을 업그레이드할 때는 스크립트도 새 버전으로 다시 내려받습니다.
+
+### 3. AI 도구 연결
+
+AI 도구가 Java 파일을 수정한 뒤 Gradle 루트와 변경한 파일을 넘겨 스크립트를 실행하도록 설정합니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 python3 tools/spotless-bridge/ai-hook.py "$PWD" \
+  src/main/java/example/Customer.java \
+  src/test/java/example/CustomerTest.java
+```
+
+예를 들어 Claude Code에서는 `.claude/settings.json`에 `PostToolUse` hook을 추가하면,
+Claude가 Java 파일을 수정할 때마다 바로 포맷합니다. 이 예시는 `jq`로 수정한 파일 경로를 읽으며,
+Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 python3 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/ai-hook.py\" \"$CLAUDE_PROJECT_DIR\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+다른 AI 도구도 같은 방식입니다. 작업에서 변경한 Java 파일을 모아 스크립트에 넘기면 됩니다.
+설정은 여기까지입니다. 첫 요청에서 daemon이 시작되고, 이후 요청은 같은 daemon을 재사용합니다.
+
+## 어떻게 동작하나요?
+
+```text
+프로젝트의 Gradle Spotless 설정
+              |
+              v
+      프로젝트 공용 포맷 daemon
+          /              \
+         /                \
+ IntelliJ 플러그인         AI hook
+ Reformat / 저장         변경한 파일
+```
+
+1. 첫 요청에서는 프로젝트의 Gradle wrapper로 Spotless 설정을 읽고 daemon을 시작합니다.
+2. 설정이 바뀌지 않았고 이미 등록된 대상 파일이면, 이후 요청은 Gradle 없이 바로 daemon에서 처리합니다.
+3. 설정이 바뀌었거나, 대상 목록에 없는 파일을 요청했거나, daemon이 실행 중이 아니면 Gradle로 daemon을 시작하거나 갱신합니다.
+
+이 문서에서 쓰는 용어는 다음과 같습니다.
+
+- **엔진**: Spotless Bridge 플러그인 JAR입니다. daemon과 hook이 Gradle 밖에서 실행할 수 있도록 `.gradle/spotless-bridge/`에
+  복사해 둡니다. 버전은 적용한 플러그인 버전과 같습니다.
+- **daemon**: Gradle 루트마다 하나씩 실행되는 백그라운드 프로세스입니다. IntelliJ, Gradle daemon과는 별개라서
+  IDE를 닫아도 hook 요청을 계속 처리합니다.
+- **worker**: daemon이 실행하는 프로세스로, 프로젝트의 Spotless 포매터를 불러와 메모리에 유지합니다.
+
+Gradle 루트마다 daemon이 따로 있으므로 프로젝트마다 자체 포매터 버전과 규칙을 유지합니다.
+daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다시 시작됩니다.
+
+## 요구 사항과 호환성
+
+- Gradle을 실행하는 JDK, 즉 `./gradlew`나 hook을 실행할 때의 `JAVA_HOME`이 **JDK 21 이상**이어야 합니다.
+- Bridge는 **Gradle 프로젝트의 Java 파일을 전체 파일 단위로** 포맷합니다. Maven 지원은 준비 중이며, 다른 언어는 지원하지 않습니다.
+- Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, 직렬화할 수 없는 포맷 단계는 지원하지 않습니다.
+  빌드에서 configuration cache를 켜 두었다면 Bridge 태스크는 `--no-configuration-cache`로 실행하세요.
+- Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
+
+Bridge 0.1.0은 다음 조합으로 검증했습니다.
+
+| JDK | Gradle | Spotless 검증 범위 |
 | --- | --- | --- |
 | 21 | 8.14.3 | 8.10.2 전체 회귀 검사, 8.0.0 버전 전환·포맷 결과 일치 검사 |
 | 21 | 8.14.6 | 동일한 검사 |
@@ -20,233 +131,106 @@ Bridge 0.1.0의 최소 실행 버전은 **JDK 21**이며, 다음 소비 프로�
 | 21 | 9.8.1 | 동일한 검사 |
 | 25 | 9.8.1 | 동일한 검사 |
 
-실제로 검사한 조합이며 모든 JDK, Gradle 8.x/9.x 또는 Spotless 버전을 보장하지는 않습니다.
-Groovy/Kotlin DSL, 일반 Spotless와의 결과 일치, 신규·제외 파일, 설정 갱신,
-공용 daemon 재사용, 동시 요청, IDE 없는 hook 실행을 검사합니다.
-Configuration cache와 isolated projects는 계속 지원하지 않습니다.
+다른 버전에서도 동작할 수 있지만, 검증한 조합은 위 표뿐입니다. JDK 25와 Gradle 8.x 또는 9.0.0의 조합은
+검증하지 않았습니다. 검사 항목은 Groovy/Kotlin DSL, 일반 Spotless와의 결과 일치, 신규·제외 파일, 설정 갱신,
+공용 daemon 재사용, 동시 요청, IDE 없이 실행하는 hook입니다.
 
-Bridge는 **JDK 21**과 저장소의 Gradle 8.14.3 wrapper로 빌드합니다. 테스트는 Java 21 대상으로 만든
-같은 엔진을 선택한 소비 프로젝트 JDK로 실행하며, Gradle·daemon·worker·hook까지 포함합니다.
-Ubuntu CI는 기존 JDK 21 조합 네 개를 유지하고 JDK 25·Gradle 9.8.1 조합을 추가했습니다.
-JDK 25 조합은 로컬 macOS의 Temurin 25.0.4.1에서도 검증했습니다.
-JDK 25와 Gradle 8.x·9.0.0의 조합은 검증 대상이 아닙니다.
-IntelliJ 지원 빌드 범위는 별도 설치 안내를 참고하세요.
+## AI hook 자세히 보기
 
-## 프로젝트 설정
+- 첫 번째 인자는 Gradle 루트이고, 나머지 인자는 각각 포맷할 파일입니다.
+  파일 경로는 Gradle 루트 기준 상대 경로와 절대 경로 모두 쓸 수 있습니다.
+  hook을 다른 디렉터리에서 실행한다면 스크립트와 Gradle 루트를 절대 경로로 지정하세요.
+- 삭제된 파일은 빼고 실제로 있는 파일만 넘기세요. 파일 인자가 없으면 아무것도 하지 않습니다.
+- 명령이 0이 아닌 종료 코드를 반환하면 hook을 실패로 처리하세요.
+- 처음 실행할 때는 Gradle로 엔진을 준비합니다. 이후에는 엔진의 Java 클라이언트를 직접 실행하므로,
+  설정이 바뀌지 않았다면 등록된 대상 파일을 Gradle 없이 포맷합니다.
+- IntelliJ는 설치되어 있지 않거나 실행 중이 아니어도 됩니다.
 
-루트 `build.gradle`에 daemon 플러그인을 적용하고, 기존 Spotless 규칙을 유지합니다.
-아래 버전은 예시이며 Spotless Bridge가 Spotless나 포매터 버전을 강제하지 않습니다.
+포맷한 뒤에도 `spotlessCheck`, 컴파일, 관련 테스트 같은 프로젝트의 기존 검증은 그대로 실행하세요.
+OpenRewrite를 함께 쓴다면 OpenRewrite를 먼저 실행해, 수정된 코드에 Bridge 포맷이 적용되도록 하세요.
 
-```groovy
-plugins {
-    id 'java'
-    id 'com.diffplug.spotless' version '8.10.2'
-    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
-}
-repositories { mavenCentral() }
-spotless {
-    java {
-        shortenFullyQualifiedTypes()
-        removeUnusedImports()
-        palantirJavaFormat('2.97.0')
-    }
-}
+### Gradle 태스크로 호출하기
+
+Gradle을 이미 실행하는 스크립트라면 적용 태스크를 직접 호출할 수도 있습니다.
+UTF-8 텍스트 파일에 대상 경로를 한 줄에 하나씩, Gradle 루트 기준 상대 경로나 절대 경로로 적습니다.
+
+```text
+src/main/java/example/Customer.java
+src/test/java/example/CustomerTest.java
 ```
 
-Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.0"`을 사용합니다.
-다중 모듈도 daemon 플러그인은 루트에 한 번 적용합니다. 각 모듈의 Spotless 설정은 따로 유지됩니다.
-JDK 21과 Gradle wrapper가 필요합니다. 현재 자동 검증 기준은 Gradle 8.14.3입니다.
-로컬 검증은 macOS에서 수행했고 CI는 Linux를 대상으로 합니다. Windows와 Gradle 9는 검증하지 않았습니다.
-
-### 공개 배포 전 로컬 사용
-
-이 저장소에서 `./gradlew publishAllPublicationsToTestRepository`를 실행하면
-`build/repository`에 구현 JAR와 플러그인 marker가 생성됩니다. 전역 Maven 저장소에는 설치하지 않습니다.
-사용할 프로젝트의 `settings.gradle`에 해당 **로컬 저장소 경로**를 지정합니다.
-
-```groovy
-pluginManagement {
-    repositories {
-        maven { url = uri('/path/to/spotless-bridge/build/repository') }
-        gradlePluginPortal()
-    }
-}
-```
-
-이 경로는 개발 중에만 필요합니다. Plugin Portal 게시 후에는 로컬 저장소 선언을 제거합니다.
-현재 공개 저장소만으로 `0.1.0`을 다운로드할 수는 없습니다.
-
-## AI hook
-
-Gradle 플러그인은 Python 스크립트를 소비 프로젝트에 자동으로 설치하지 않습니다.
-Python 3와 JDK 21이 필요하며, 첫 실행에서 사용할 `JAVA_HOME`을 JDK 21로 설정하세요.
-
-현재는 **이 변경이 포함된 로컬 소스**에서 아래 두 파일을 복사합니다. 공개 Release와 태그는 아직 없습니다.
-공개 배포 후에는 Gradle 플러그인 버전과 일치하는 `v<version>` Release의 소스 압축 파일을 내려받아
-같은 방식으로 설치합니다. 예를 들어 플러그인 `0.1.0`에는 `v0.1.0` 소스를 사용하며 `main`을 따라가지 않습니다.
-
-소비 프로젝트의 Gradle 루트에서 실행합니다. 경로는 실제 소스 위치로 바꾸세요.
-
-```sh
-bridge_source=/path/to/spotless-bridge
-mkdir -p tools/spotless-bridge
-cp "$bridge_source/scripts/ai-hook.py" tools/spotless-bridge/ai-hook.py
-cp "$bridge_source/LICENSE" tools/spotless-bridge/LICENSE
-```
-
-복사한 두 파일은 소비 프로젝트의 Git에 포함합니다. 프로젝트 자체 라이선스를 교체하지 않습니다.
-스크립트는 Python 표준 라이브러리만 사용하므로 `pip` 설치가 필요하지 않습니다.
-
-AI 도구의 작업 완료 hook에서 다음 명령을 실행하도록 연결합니다. 명령은 Gradle 루트에서 실행하며,
-파일 인자에는 존재하는 변경 Java 파일만 개별 인자로 전달합니다. 공백·쉼표가 있는 경로는 따옴표로 감싸세요.
-
-```sh
-export JAVA_HOME=/path/to/jdk21
-python3 tools/spotless-bridge/ai-hook.py "$PWD" src/main/java/Changed.java
-```
-
-다른 작업 디렉터리에서는 스크립트와 Gradle 루트를 절대 경로로 지정합니다.
-스크립트가 변경 파일을 자동 탐색하지는 않습니다. 파일을 생략하면 아무 작업 없이 성공하며,
-존재하지 않는 파일은 실패하므로 삭제된 파일은 호출 측에서 제외하세요.
-업그레이드할 때는 Gradle 플러그인 버전과 복사한 스크립트를 함께 갱신합니다.
-
-첫 실행에는 Gradle로 프로젝트가 선택한 엔진을 설치합니다. 이후에는 프로젝트의
-`.gradle/spotless-bridge/client-runtime.txt`가 가리키는 클라이언트를 직접 실행합니다.
-클라이언트는 현재 설정·파일 대상·연결을 확인합니다. **이미 Spotless 대상 목록에 등록된 파일이고
-설정이 같으며 daemon이 실행 중이면 Gradle을 생략**합니다. daemon이 없거나 설정이 바뀌거나
-대상 목록에 없는 파일을 요청하면 Gradle로 시작·갱신합니다. 제외된 파일은 수정하지 않지만,
-현재는 같은 제외 파일을 반복해서 hook에 전달해도 매번 Gradle로 대상 여부를 다시 평가합니다.
-
-Gradle 태스크로 직접 사용하는 경로도 있습니다. 파일 목록은 UTF-8, 한 줄에 경로 하나이며 상대 경로는
-Gradle 루트 기준입니다. 이 명령은 호출할 때마다 Gradle을 평가하므로 반복 hook에는 위 스크립트를 권장합니다.
+그런 다음 이 파일을 적용 태스크에 전달합니다.
 
 ```sh
 ./gradlew --no-configuration-cache spotlessBridgeApply -PspotlessBridgeFiles=/path/to/changed-files.txt
 ```
 
-목록 인자를 빠뜨리면 실패하며 전체 소스로 적용 범위를 넓히지 않습니다.
-종료 코드가 0이 아니면 hook도 실패로 처리해야 합니다.
-OpenRewrite를 함께 사용하면 `Rewrite → daemon 포맷 → spotlessCheck·컴파일·필요한 테스트` 순서로
-연결합니다. 포맷만 Gradle을 생략하며 Rewrite·검사·컴파일 태스크는 기존대로 실행합니다.
-포맷 성공이 전체 테스트 성공을 의미하지는 않습니다.
+이 방식은 매번 Gradle을 평가하므로, 자주 실행되는 hook에는 Python 스크립트를 사용하세요.
 
-## IntelliJ
+## IntelliJ IDEA (미리보기)
 
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew clean build pluginZip
-```
+IntelliJ 플러그인은 **Reformat Code**를 실행하거나 Java 파일을 저장할 때 Spotless 규칙을 적용합니다.
+AI hook과 같은 daemon을 사용합니다. JetBrains Marketplace에는 추후 배포할 예정이며, 그전까지는
+[소스에서 빌드해 설치](docs/install-from-source.ko.md#3-intellij-플러그인-빌드와-설치)하세요.
+AI hook은 IntelliJ 플러그인 없이도 사용할 수 있습니다.
 
-`build/distributions/spotless-bridge-0.1.0.zip`은 **IDE 연결 코드만** 포함합니다.
-실행 엔진 버전은 프로젝트의 Gradle 플러그인이 소유합니다.
-IDE SDK는 ZIP 빌드에만 필요합니다. 현재 ZIP 빌드는 macOS 앱 디렉터리 구조를 전제로 하며,
-앱 경로는 `-PideaHome=/path/to/IntelliJ/Contents`로 지정할 수 있습니다.
-플러그인 설치 허용 범위는 IntelliJ IDEA 빌드 `262.10968` 이상, `262.*`까지입니다.
-그보다 이른 262 빌드는 포함하지 않습니다.
+설치한 뒤에는 다음과 같이 설정합니다.
 
-실제 설치와 설정 변경은 사용자가 수행합니다.
+1. **Settings → Tools → Spotless Bridge**에서 플러그인을 켜고 JDK 21 경로를 지정합니다.
+2. 필요하면 Gradle 루트를 지정합니다. AI hook과 같은 루트를 사용하세요.
+3. Java 소스 파일에서 **Reformat Code**를 실행하면 Spotless 규칙으로 포맷됩니다.
+4. 저장할 때 자동으로 포맷하려면 **Tools → Actions on Save → Reformat code**에서 **Java / Whole file**을 선택합니다.
+   포맷 결과가 다시 바뀌지 않도록, 겹치는 Java 포매터와 Optimize imports·Rearrange code·Code cleanup 저장 동작은 끄세요.
 
-기존 개발판에서 교체할 때는 이전 플러그인을 비활성화하거나 제거한 뒤 새 ZIP을 설치합니다.
-플러그인 ID와 설정 저장 이름이 바뀌었으므로 아래 프로젝트 설정을 다시 적용합니다.
-Gradle 명령은 `spotlessBridgeStart/Status/Stop/Apply`, 상태 경로는 `.gradle/spotless-bridge`입니다.
-기존 개발판과 함께 켜두지 마세요.
+플러그인은 IntelliJ가 소스로 인식하는, 쓰기 가능한 로컬 Java 파일만 처리합니다. 선택 영역 포맷은 지원하지 않습니다.
+IntelliJ에는 LF 줄바꿈 텍스트를 반환하고, hook으로 저장하는 파일에는 프로젝트 Spotless의 인코딩·줄바꿈 설정을 적용합니다.
 
-1. Settings → Plugins → 톱니바퀴 → Install Plugin from Disk…에서 ZIP을 선택합니다.
-2. Settings → Tools → Spotless Bridge에서 사용을 켜고 JDK 21 경로를 지정합니다.
-3. 필요한 경우 Gradle 루트와 추가 변경 감지 경로를 지정합니다.
-4. Tools → Actions on Save → Reformat code에서 Java / Whole file을 선택합니다.
-   겹치는 Java 포매터, Optimize imports·Rearrange code·Code cleanup은 끕니다.
+## 설정 변경
 
-IDE 연결은 IntelliJ가 소스 영역으로 인식하는 쓰기 가능한 로컬 Java 파일만 처리합니다.
-소스 영역 밖의 Java 파일은 Spotless 대상이어도 hook에서만 처리되고 IDE에서는 처리되지 않을 수 있습니다.
-빠른 포맷과 공백만 변경할 수 있는 요청은 건너뜁니다.
+- 빌드 스크립트, Gradle 설정, wrapper 파일, `.editorconfig` 같은 포맷 설정 파일의 변경은 자동으로 감지합니다.
+  환경 변수나 감지 대상 밖의 입력을 바꿨다면 `spotlessBridgeStart`를 실행해 직접 갱신하세요.
+  IntelliJ에서 추가한 감지 경로는 해당 IDE 클라이언트에만 적용됩니다.
+- IDE와 hook 요청에는 같은 Gradle 속성과 환경을 사용하세요. 같은 Gradle 루트의 클라이언트는 가장 최근에 갱신된 설정을 함께 씁니다.
+- 제외된 파일은 수정하지 않습니다. 대상 목록에 없는 파일은 Gradle 평가를 거치므로, 제외된 파일을 반복해서 넘기면 매번 다시 평가합니다.
+  포맷할 Java 파일만 넘기고, 생성 코드를 포맷하려면 소스 생성 작업을 먼저 실행하세요.
 
-Reformat Code와 저장 시 포맷은 문서 내용을 daemon에 보내고, 최신 문서에만 결과를 반영합니다.
-IDE에 반환할 때만 LF로 바꿉니다. hook의 디스크 저장은 Spotless 인코딩·줄바꿈 정책을 따릅니다.
-IDE를 닫거나 설정을 끄면 해당 연결만 닫습니다. 공용 daemon은 다른 hook이 계속 사용할 수 있습니다.
-**다음 포맷 시 설정 다시 불러오기**는 연결의 캐시를 비웁니다.
+## 문제 해결
 
-## 동작과 수명
-
-| 구성 | 역할 |
-| --- | --- |
-| 프로젝트 Gradle | Spotless 설정·대상 평가, 라이브러리 다운로드, daemon 엔진 선택 |
-| `GradleFormatter` | IDE 연결, 설정 변경·새 파일 감지 시 Gradle 재평가 요청 |
-| `SharedDaemon` | 루프백 연결, 요청 직렬 처리, 프로젝트별 수명 관리 |
-| 내부 worker | 프로젝트 라이브러리로 포맷 수행, 오류·시간 초과 시 격리 및 재시작 |
-
-프로젝트의 canonical Gradle 루트마다 공용 daemon 하나가 존재합니다.
-내부 worker 하나는 daemon이 소유합니다. IntelliJ용·hook용 worker를 따로 만들지 않습니다.
-설정이 그대로면 daemon과 worker를 모두 재사용합니다. 설정이나 파일 대상 목록이 바뀌면
-같은 daemon 안에서 worker를 교체합니다. 엔진 JAR나 실행 JDK가 바뀌면 daemon도 교체합니다.
-
-Gradle 태스크는 설정을 직접 내보내므로 daemon에서 Gradle을 다시 호출하지 않습니다.
-태스크와 daemon이 서로 기다리는 중첩 Gradle 실행을 피합니다.
-정상 실행 중인 daemon과 설정이 같으면, IntelliJ 연결 초기화 이후 등록된 Spotless 대상 파일의
-반복 요청은 Gradle을 생략합니다. hook도 등록된 대상 파일과 설정이 같으면 Gradle을 생략합니다.
-제외된 파일을 hook으로 반복 요청하는 경우는 위 AI hook 절의 재평가 조건을 따릅니다.
+평소에는 daemon을 직접 관리할 필요가 없습니다. 상태를 확인하려면 프로젝트의 Gradle 루트에서 다음 명령을 실행하세요.
 
 ```sh
-./gradlew spotlessBridgeStart    # 현재 설정으로 시작 또는 갱신
-./gradlew spotlessBridgeStatus   # PID, 실행 중이 아니면 -1
-./gradlew spotlessBridgeStop     # 명시적 종료
+./gradlew --no-configuration-cache spotlessBridgeStatus
+./gradlew --no-configuration-cache spotlessBridgeStart
+./gradlew --no-configuration-cache spotlessBridgeStop
 ```
 
-- 사용하지 않은 지 30분이 지나면 daemon과 worker가 종료됩니다.
-- 중복 시작은 파일 잠금으로 막고, 종료된 daemon의 남은 연결 정보는 다음 시작에서 교체합니다.
-- 로컬 루프백 TCP와 프로젝트별 인증 토큰을 사용합니다. 외부 네트워크에는 바인딩하지 않습니다.
-- 요청을 순서대로 처리하여 동시에 여러 hook·IDE가 요청해도 같은 포매터에 병렬 접근하지 않습니다.
-- 상태·로그는 `.gradle/spotless-bridge/`의 `endpoint.properties`, `daemon.log`, `worker.log`,
-  `gradle-start-*.log`, `client-runtime.txt`, `snapshots/`, `runtime/`에 있습니다. Git에 포함하지 마세요.
-- 삭제가 필요하면 먼저 `spotlessBridgeStop`을 실행한 뒤 위 디렉터리를 삭제합니다.
+`spotlessBridgeStatus`는 `Spotless Bridge pid=<숫자>`를 출력하며, `-1`이면 실행 중인 daemon이 없다는 뜻입니다.
+IntelliJ와 hook이 같은 daemon을 쓰는지 확인하려면 양쪽에서 파일을 포맷한 뒤 PID가 그대로인지 보면 됩니다.
 
-## 변경 감지와 제한
+실행 정보와 로그는 프로젝트의 `.gradle/spotless-bridge/`에 저장되며, 이 디렉터리는 Git에 포함하지 마세요.
+요청이 실패하면 이 디렉터리의 `daemon.log`, `worker.log`, `gradle-start-*.log`를 확인하세요.
+디렉터리를 삭제하려면 먼저 daemon을 종료하세요.
 
-빌드 스크립트, Gradle properties, wrapper, `gradle/`, `buildSrc/`, `build-logic/`, TOML,
-`.editorconfig`, `.gitattributes`, 포함 빌드·외부 프로젝트, Gradle 사용자 홈 초기화 설정을 감지합니다.
-IDE에서 별도로 지정한 추가 경로는 해당 IDE 클라이언트만 감지하며 hook에 자동 공유되지 않습니다.
-hook의 감지 범위 밖에 있는 입력을 바꾸었다면 `spotlessBridgeStart`로 명시적으로 갱신하세요.
-없는 파일은 제외 캐시에 넣지 않아 첫 저장 후 다시 평가합니다.
+IDE와 hook이 동시에 요청하면 순서대로 처리합니다. 설정이 바뀌면 포매터 worker를 갱신하고,
+엔진이나 JDK가 바뀌면 daemon까지 교체합니다.
 
-환경 변수·원격 데이터 등 모든 Gradle 입력을 자동 추적하지는 않습니다.
-동적으로 변한 입력은 `spotlessBridgeStart`로 명시적으로 갱신하세요.
-동시에 서로 다른 `-P` 옵션을 사용하는 도구는 마지막으로 갱신한 설정을 공유합니다.
-같은 프로젝트를 사용할 때 Gradle 속성·환경을 맞추세요.
+## 왜 만들었나요?
 
-- Java 전체 파일만 지원합니다. Maven, 다른 언어, 선택 영역 포맷은 지원하지 않습니다.
-- Spotless 내부 API와 직렬화를 사용합니다. 모든 버전·사용자 정의 단계를 보장하지 않습니다.
-- `ratchetFrom`과 직렬화 불가 단계는 실패합니다. 실패 시 과거 설정으로 대신 포맷하지 않습니다.
-- configuration cache·isolated projects는 지원하지 않으며 배포 메타데이터에도 명시합니다.
-- 설정 평가 120초, worker 포맷 15초, TCP 응답 대기 30초, UTF-8 메시지 최대 16 MiB입니다.
-- hook은 포맷 중 파일·설정이 달라지면 덮어쓰기 전에 실패합니다. 외부 편집기와의 원자적 잠금은 보장하지 않습니다.
-- 기본 정책 밖에 생성되는 소스는 해당 생성 태스크를 먼저 실행해야 합니다.
+IntelliJ에서 파일을 저장하거나 AI가 코드를 생성할 때마다 Spotless로 포맷을 맞추고 싶었습니다.
+그런데 매번 `spotlessApply`를 호출하면 파일 하나만 바꿔도, Gradle daemon이 떠 있어도
+Gradle 설정 평가와 태스크 실행을 기다려야 했습니다.
 
-## 검증과 배포
+프론트엔드 도구는 이 문제를 상주 프로세스로 풉니다. TypeScript의
+[tsserver](https://github.com/microsoft/TypeScript/wiki/Standalone-Server-%28tsserver%29)는 계속 떠 있으면서
+에디터 요청에 응답하고, [Prettier VS Code 확장](https://github.com/prettier/prettier-vscode)은 프로젝트에 설치된
+Prettier를 불러와 포맷합니다. Spotless Bridge는 같은 아이디어를 Spotless에 적용해,
+**메모리를 조금 더 쓰더라도 포맷할 때마다 기다리지 않게** 합니다. 규칙은 프로젝트의 Spotless 설정에 그대로 남으므로,
+빌드나 CI에서는 기존처럼 `spotlessCheck`로 포맷 결과를 검사하면 됩니다.
 
-같은 검사를 다른 소비 프로젝트 Gradle 버전으로 실행하려면 다음과 같이 지정합니다. 기본값은 `8.14.3`입니다.
+## 기여하기
 
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
-```
-
-컴파일은 JDK 21로 유지하고 전체 호환성 검사를 JDK 25로 실행하려면 다음과 같이 지정합니다.
-
-```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
-  -PtestGradleVersion=9.8.1 -PtestJavaHome=/path/to/jdk25
-```
-
-`testJavaHome`의 기본값은 빌드 JVM의 홈 경로입니다. hook 최초 실행의 `JAVA_HOME`에도 적용하며,
-시스템 기본 Java나 엔진의 최소 실행 버전을 바꾸지 않습니다.
-
-`./gradlew check`는 IDE 없이 로컬 Maven 저장소에 플러그인을 게시한 후 실제 소비 프로젝트에서 실행합니다.
-Spotless 8.10.2/8.0.0, Palantir·Google·Eclipse, Groovy/Kotlin DSL, 다중 모듈,
-제외 캐시·신규 파일, 설정 변경·실패·복구, 일반 Spotless 결과 일치,
-공용 daemon 재사용·동시 요청·재시작·종료·프로젝트에 복사한 hook 실행을 확인합니다.
-설정이 같은 등록 대상 파일에 대한 반복 hook의 실제 Gradle 호출 0회도 검증합니다.
-테스트는 Gradle에서 프로젝트 버전을 전달받아 사용하며 특정 버전을 고정하지 않습니다.
-실제 IDE 저장 UI, Plugin Verifier, Marketplace 심사는 별도 검증입니다.
-
-배포 절차와 내부 API 주의점은 [유지보수 문서](docs/maintenance.md)를 참고하세요.
+소스에서 Bridge를 빌드하거나, 테스트를 실행하거나, 배포 전 변경 사항을 써 보려면 [소스에서 설치하기](docs/install-from-source.ko.md)를 참고하세요.
+구현과 배포 절차는 [유지보수 문서](docs/maintenance.md)에 정리되어 있습니다.
 
 ## 라이선스
 
