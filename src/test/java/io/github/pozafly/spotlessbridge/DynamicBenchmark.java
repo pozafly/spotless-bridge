@@ -30,7 +30,7 @@ public final class DynamicBenchmark {
                 List<Double> measured = new ArrayList<>(timings.get(i).subList(4, 14));
                 Collections.sort(measured);
                 System.out.println("sample=" + i + " median_ms=" + (measured.get(4) + measured.get(5)) / 2 + " min_ms="
-                        + measured.getFirst() + " max_ms=" + measured.getLast());
+                        + measured.get(0) + " max_ms=" + measured.get(measured.size() - 1));
             }
             System.out.println(
                     "PASS: 42 results match reference Gradle outputs; full request path including file change detection");

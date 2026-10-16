@@ -27,7 +27,7 @@ public final class FormatterSettingsPage implements Configurable {
         enabled = new JCheckBox("이 프로젝트에서 Spotless Bridge 사용");
         javaHome = new JTextField();
         panel.add(enabled);
-        panel.add(new JLabel("JDK 21 홈 경로 (비워두면 프로젝트 SDK 사용)"));
+        panel.add(new JLabel("JDK 17 이상 홈 경로 (포매터 요구 버전 확인, 비워두면 프로젝트 SDK 사용)"));
         panel.add(javaHome);
         gradleRoot = new JTextField();
         extraWatch = new JTextArea(3, 50);

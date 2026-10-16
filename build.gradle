@@ -42,7 +42,10 @@ tasks.named('processResources', ProcessResources) {
 }
 
 repositories { mavenCentral() }
-java { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
+// Build with JDK 21 while keeping the engine, Gradle plugin and tests runnable on JDK 17.
+java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+tasks.named('compileJava', JavaCompile) { options.release = 17 }
+tasks.named('compileTestJava', JavaCompile) { options.release = 17 }
 // The IDE SDK is only needed for pluginZip, not for engine/Gradle tests or CI.
 def ideaHome = providers.gradleProperty('ideaHome').orElse('/Applications/IntelliJ IDEA.app/Contents')
 sourceSets {

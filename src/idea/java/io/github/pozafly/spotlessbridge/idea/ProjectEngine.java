@@ -46,7 +46,7 @@ public final class ProjectEngine implements Disposable {
                 Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
                 return sdk == null ? null : sdk.getHomePath();
             });
-        if (home == null || home.isBlank()) throw new IOException("Spotless Bridge 설정에서 JDK 21 경로를 지정하세요.");
+        if (home == null || home.isBlank()) throw new IOException("Spotless Bridge 설정에서 JDK 17 이상 경로를 지정하세요. 포매터가 요구하는 JDK 버전도 확인하세요.");
         List<Path> extraWatch = new ArrayList<>();
         for (String line : settings.extraWatch.lines().toList())
             if (!line.isBlank()) extraWatch.add(root.resolve(line.trim()).normalize());
