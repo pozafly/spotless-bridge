@@ -42,7 +42,7 @@ public final class ProjectEngine implements Disposable {
         if (existing != null) return existing;
         String home = settings.javaHome;
         if (home.isBlank())
-            home = ReadAction.compute(() -> {
+            home = ReadAction.computeBlocking(() -> {
                 Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
                 return sdk == null ? null : sdk.getHomePath();
             });

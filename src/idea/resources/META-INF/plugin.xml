@@ -8,7 +8,7 @@
         Enable per project under Settings > Tools > Spotless Bridge.
         Automatically reloads saved build configuration on the next format request. Reuses the worker while configuration is unchanged.
     ]]></description>
-    <idea-version since-build="262.10968" until-build="262.*"/>
+    <idea-version since-build="${ideaSdkBuild}" until-build="262.*"/>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <extensions defaultExtensionNs="com.intellij">
