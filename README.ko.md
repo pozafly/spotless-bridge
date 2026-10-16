@@ -49,12 +49,15 @@ macOS·Linux용 `tools/spotless-bridge/spotless-bridge`, Windows용 `spotless-br
 런처는 적용한 플러그인 버전의 엔진을 실행하기만 하므로, 플러그인을 업그레이드해도 다시 설치할 일은 거의 없습니다.
 런처를 갱신해야 하면 Bridge가 경고합니다. Windows 런처는 아직 CI에서 검증하지 않습니다.
 
+`ai-hook.py`를 쓰던 0.1.0에서 업그레이드한다면, 런처를 설치한 뒤 `./gradlew spotlessBridgeStart`를 한 번 실행해
+새 엔진으로 바꾸고, AI hook이 `spotless-bridge`를 실행하도록 고친 다음 `ai-hook.py`를 삭제하세요.
+
 ### 3. AI 도구 연결
 
 AI 도구가 Java 파일을 수정한 뒤 Gradle 루트와 변경한 파일을 넘겨 런처를 실행하도록 설정합니다.
 
 ```sh
-JAVA_HOME=/path/to/jdk21 tools/spotless-bridge/spotless-bridge "$PWD" \
+JAVA_HOME=/path/to/jdk tools/spotless-bridge/spotless-bridge "$PWD" \
   src/main/java/example/Customer.java \
   src/test/java/example/CustomerTest.java
 ```
@@ -72,7 +75,7 @@ Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
           }
         ]
       }
@@ -82,7 +85,7 @@ Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
 ```
 
 다른 AI 도구도 같은 방식입니다. 작업에서 변경한 Java 파일을 모아 런처에 넘기면 됩니다.
-`JAVA_HOME`은 Gradle로 엔진을 준비하는 첫 실행에만 필요합니다.
+`JAVA_HOME`은 JDK 17 이상이어야 하며, 런처가 Gradle로 엔진을 준비할 때만 필요합니다.
 설정은 여기까지입니다. 첫 요청에서 daemon이 시작되고, 이후 요청은 같은 daemon을 재사용합니다.
 
 ## 어떻게 동작하나요?
@@ -139,6 +142,8 @@ Gradle wrapper와 Spotless 플러그인 버전을 위 범위에 맞추고, Gradl
 - Gradle은 **8.14.3 이상·10.0 미만**, Spotless는 **8.x**를 허용합니다. 범위 안에서 아래 표에 없는 버전은
   경고를 표시하고 계속 실행합니다. 범위를 벗어나면 포맷 전에 중단하며, 감지한 버전과 허용 범위를 오류에 표시합니다.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
+- 신뢰하는 프로젝트에서만 사용하세요. 일반 Gradle 빌드처럼 daemon도 프로젝트의 빌드 설정과 포매터 코드를 실행합니다.
+  상태 디렉터리는 현재 사용자만 접근할 수 있고, 요청은 daemon마다 발급한 토큰으로 인증합니다.
 
 Bridge 0.1.1은 다음 조합으로 검증했습니다.
 
@@ -250,6 +255,10 @@ Gradle 설정 평가와 태스크 실행을 기다려야 했습니다.
 Prettier를 불러와 포맷합니다. Spotless Bridge는 같은 아이디어를 Spotless에 적용해,
 **메모리를 조금 더 쓰더라도 포맷할 때마다 기다리지 않게** 합니다. 규칙은 프로젝트의 Spotless 설정에 그대로 남으므로,
 빌드나 CI에서는 기존처럼 `spotlessCheck`로 포맷 결과를 검사하면 됩니다.
+
+## 변경 내역
+
+버전별 변경 사항과 업그레이드 방법은 [CHANGELOG.md](CHANGELOG.md)를 참고하세요.
 
 ## 기여하기
 

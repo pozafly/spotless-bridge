@@ -49,12 +49,15 @@ and their `LICENSE`. Add `-PspotlessBridgeHookDir=<dir>` to use another director
 The launchers only start the engine of the plugin version you apply, so a plugin upgrade rarely needs a
 reinstall; Bridge warns when a launcher is out of date. The Windows launcher is not yet covered by CI.
 
+Upgrading from 0.1.0, which used `ai-hook.py`: after installing the launchers, run `./gradlew spotlessBridgeStart`
+once so the project switches to the new engine, point your AI hook at `spotless-bridge`, and delete `ai-hook.py`.
+
 ### 3. Connect your AI tool
 
 Have your AI tool run the launcher after it edits Java files, passing the Gradle root and the changed files:
 
 ```sh
-JAVA_HOME=/path/to/jdk21 tools/spotless-bridge/spotless-bridge "$PWD" \
+JAVA_HOME=/path/to/jdk tools/spotless-bridge/spotless-bridge "$PWD" \
   src/main/java/example/Customer.java \
   src/test/java/example/CustomerTest.java
 ```
@@ -72,7 +75,7 @@ and assumes the Claude Code project directory is the Gradle root:
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
           }
         ]
       }
@@ -82,7 +85,7 @@ and assumes the Claude Code project directory is the Gradle root:
 ```
 
 Other AI tools work the same way: collect the Java files the task changed and pass them to the launcher.
-`JAVA_HOME` is only needed for the first call, which runs Gradle to prepare the engine.
+`JAVA_HOME` must point to JDK 17 or newer and is only needed when the launcher runs Gradle to prepare the engine.
 That's it. The first request starts the daemon, and later requests reuse it.
 
 ## How it works
@@ -140,6 +143,8 @@ Update your Gradle wrapper and Spotless plugin to the ranges above, and run Grad
   but outside the verification table produce a warning; other versions stop with an error before formatting.
   The error includes the detected version and the accepted range.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
+- Use Bridge only in projects you trust. Like any Gradle build, the daemon runs your build configuration and
+  formatter code. Its state directory is private to your user, and requests are authenticated with a per-daemon token.
 
 Bridge 0.1.1 is tested with these combinations:
 
@@ -257,6 +262,10 @@ answer editor requests, and the [Prettier VS Code extension](https://github.com/
 loads the project's own Prettier. Spotless Bridge applies the same idea to Spotless: it **spends a little
 memory to keep the formatter ready instead of waiting for it on every edit**, while the rules stay in
 your project's Spotless configuration. Keep running `spotlessCheck` in your build or CI to verify formatting.
+
+## Release notes
+
+See [CHANGELOG.md](CHANGELOG.md) for changes in each version and how to upgrade.
 
 ## Contributing
 
