@@ -1,14 +1,14 @@
 plugins { id 'com.gradle.plugin-publish' version '2.2.1' }
 gradlePlugin {
-    website = 'https://github.com/pozafly/spotless-bridge'
+    website = 'https://github.com/pozafly/spotless-bridge#quick-start'
     vcsUrl = 'https://github.com/pozafly/spotless-bridge.git'
     plugins {
         spotlessBridge {
             id = 'io.github.pozafly.spotlessbridge'
             implementationClass = 'io.github.pozafly.spotlessbridge.SpotlessBridgePlugin'
             displayName = 'Spotless Bridge'
-            tags.addAll('spotless', 'formatter', 'formatting', 'java', 'intellij', 'ai', 'daemon')
-            description = "Format Java files with your project's own Spotless rules from AI coding hooks and IntelliJ, without waiting for Gradle on every run"
+            tags.addAll('spotless', 'formatter', 'java', 'code-style', 'intellij', 'claude-code', 'ai-coding')
+            description = "Format Java with your project's own Spotless rules after every AI edit and IntelliJ save. A warm daemon formats files about 20x faster than running spotlessApply each time"
             compatibility(it) {
                 features {
                     configurationCache = false

@@ -3,6 +3,14 @@
 All notable changes to Spotless Bridge are documented here. The release workflow publishes the section
 for each `v<version>` tag as its GitHub Release notes.
 
+## [0.2.1] - 2026-10-16
+
+- Update the Gradle Plugin Portal description, tags and website link. No change to plugin behavior.
+
+### Upgrading from 0.2.0
+
+Change the Bridge plugin version to `0.2.1`. No other changes are needed.
+
 ## [0.2.0] - 2026-10-16
 
 - Bundle a Rust hook client in the Gradle plugin, selected and installed per OS/CPU without a separate user runtime.
