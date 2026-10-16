@@ -36,31 +36,18 @@ In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.1"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
-### 2. Add the hook launcher
+### 2. Connect your AI tool
 
-From your project's Gradle root, let the plugin write the hook launchers:
-
-```sh
-./gradlew spotlessBridgeInstallHook
-```
-
-This writes `tools/spotless-bridge/spotless-bridge` for macOS and Linux, `spotless-bridge.cmd` for Windows,
-and their `LICENSE`. Add `-PspotlessBridgeHookDir=<dir>` to use another directory. Commit these files.
-The launchers only start the engine of the plugin version you apply, so a plugin upgrade rarely needs a
-reinstall; Bridge warns when a launcher is out of date. The Windows launcher is not yet covered by CI.
-
-Upgrading from 0.1.0, which used `ai-hook.py`: install the launchers as above, point your AI hook at
-`spotless-bridge`, and delete `ai-hook.py`. The next hook call prepares the new engine through Gradle once.
-
-### 3. Connect your AI tool
-
-Have your AI tool run the launcher after it edits Java files, passing the Gradle root and the changed files:
+The plugin keeps a small launcher in `.gradle/spotless-bridge/` and updates it on every Gradle run, such as a build
+or an IntelliJ Gradle sync. There is nothing to install or commit. Have your AI tool run it after it edits Java files:
 
 ```sh
-JAVA_HOME=/path/to/jdk tools/spotless-bridge/spotless-bridge "$PWD" \
+JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
   src/main/java/example/Customer.java \
   src/test/java/example/CustomerTest.java
 ```
+
+On Windows, use `.gradle\spotless-bridge\spotless-bridge.cmd`; the Windows launcher is not yet covered by CI.
 
 For example, in Claude Code you can add a `PostToolUse` hook to `.claude/settings.json`.
 It formats each Java file right after Claude edits it. This example uses `jq` to read the edited path
@@ -75,7 +62,7 @@ and assumes the Claude Code project directory is the Gradle root:
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk xargs -0 \"$CLAUDE_PROJECT_DIR/.gradle/spotless-bridge/spotless-bridge\""
           }
         ]
       }
@@ -87,6 +74,9 @@ and assumes the Claude Code project directory is the Gradle root:
 Other AI tools work the same way: collect the Java files the task changed and pass them to the launcher.
 `JAVA_HOME` must point to JDK 17 or newer and is only needed when the launcher runs Gradle to prepare the engine.
 That's it. The first request starts the daemon, and later requests reuse it.
+
+If you upgrade from 0.1.0, which used `tools/spotless-bridge/ai-hook.py`, point your AI hook at the launcher above
+and delete the old `tools/spotless-bridge/` directory.
 
 ## How it works
 
@@ -168,9 +158,10 @@ and two of them on macOS.
 
 ## More on the AI hook
 
-- The first argument is the Gradle root; each remaining argument is a file to format.
-  Paths can be absolute or relative to the Gradle root. If the hook runs from another directory,
-  use absolute paths for both the launcher and the Gradle root.
+- Each argument is a file to format, absolute or relative to the Gradle root. The launcher finds the Gradle root
+  from its own location, so it can run from any directory.
+- The launcher appears after Gradle has run once in the project. In a fresh clone, run any Gradle command
+  (or open the project in IntelliJ) first.
 - Pass only existing files; leave out deleted ones. With no file arguments, the launcher does nothing.
 - Treat a nonzero exit code as a hook failure.
 - The first call prepares the engine through Gradle. Later calls start the engine's Java client directly,
@@ -202,7 +193,7 @@ This approach evaluates Gradle on every run, so prefer the launcher for frequent
 
 The IntelliJ plugin applies your Spotless rules when you run **Reformat Code** or save a Java file.
 It uses the same daemon as your AI hook. It will be published to JetBrains Marketplace later; until then,
-[build and install it from source](docs/install-from-source.md#3-build-and-install-the-intellij-plugin).
+[build and install it from source](docs/install-from-source.md#2-build-and-install-the-intellij-plugin).
 AI hooks work without the IntelliJ plugin.
 
 After installing it:

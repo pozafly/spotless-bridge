@@ -2,8 +2,8 @@ package io.github.pozafly.spotlessbridge;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.gradle.api.*;
@@ -34,6 +34,8 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
         if (!java.util.List.of("8.14.3", "8.14.6", "9.0.0", "9.8.1").contains(gradleVersion))
             project.getLogger().warn("Spotless Bridge: Gradle {} is within the supported range but has not been verified. "
                     + "Verified Gradle versions: 8.14.3, 8.14.6, 9.0.0, 9.8.1.", gradleVersion);
+        // AI hooks run the launcher in .gradle, so any Gradle run (a build or an IDE sync) makes it available.
+        writeLaunchers(project.getProjectDir().toPath());
         project.getTasks().register("spotlessBridgeStart", task -> {
             task.setGroup("formatting");
             task.setDescription("Export current Spotless settings and start or refresh the project daemon");
@@ -57,7 +59,6 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
                 } catch (Exception e) {
                     throw new GradleException("Cannot prepare daemon state", e);
                 }
-                warnIfHookOutdated(project);
             });
         });
         project.apply(Map.of("from", getClass().getResource("/export.gradle")));
@@ -75,30 +76,6 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
                             project.getProjectDir().toPath(), project.file(list).toPath());
                 } catch (Exception e) {
                     throw new GradleException("Spotless Bridge apply failed", e);
-                }
-            });
-        });
-        project.getTasks().register("spotlessBridgeInstallHook", task -> {
-            task.setGroup("formatting");
-            task.setDescription("Write the AI hook launchers to -PspotlessBridgeHookDir (default "
-                    + DEFAULT_HOOK_DIRECTORY + ")");
-            task.notCompatibleWithConfigurationCache("Writes into the project directory");
-            task.doLast(ignored -> {
-                try {
-                    Path directory = hookDirectory(project);
-                    Files.createDirectories(directory);
-                    for (String name : LAUNCHERS) Files.write(directory.resolve(name), resource(name));
-                    Files.write(directory.resolve("LICENSE"), resource("LICENSE"));
-                    directory.resolve(LAUNCHERS.get(0)).toFile().setExecutable(true);
-                    // The recorded client may belong to an older engine (0.1.0 does not accept --hook).
-                    // Without it, the next hook call prepares this plugin's engine through Gradle once.
-                    Files.deleteIfExists(project.getProjectDir().toPath().resolve(".gradle/spotless-bridge/client-runtime.txt"));
-                    project.getLogger().lifecycle("Spotless Bridge: installed hook launchers in {}", directory);
-                    if (Files.exists(directory.resolve(LEGACY_SCRIPT)))
-                        project.getLogger().warn("Spotless Bridge: {} is no longer used. Point your AI hook at {} and delete it.",
-                                directory.resolve(LEGACY_SCRIPT), directory.resolve(LAUNCHERS.get(0)));
-                } catch (IOException e) {
-                    throw new GradleException("Cannot install the Spotless Bridge hook launchers", e);
                 }
             });
         });
@@ -122,47 +99,34 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
         }
     }
 
-    private static final String DEFAULT_HOOK_DIRECTORY = "tools/spotless-bridge";
     private static final List<String> LAUNCHERS = List.of("spotless-bridge", "spotless-bridge.cmd");
-    private static final String LEGACY_SCRIPT = "ai-hook.py";
-
-    private static Path hookDirectory(Project project) {
-        Object configured = project.findProperty("spotlessBridgeHookDir");
-        return project.file(configured == null ? DEFAULT_HOOK_DIRECTORY : configured).toPath();
-    }
-
-    private static byte[] resource(String name) throws IOException {
-        try (InputStream input = SpotlessBridgePlugin.class.getResourceAsStream("/spotless-bridge/" + name)) {
-            if (input == null) throw new IOException("Missing packaged resource spotless-bridge/" + name);
-            return input.readAllBytes();
-        }
-    }
-
-    private static String normalized(byte[] content) {
-        // Git may rewrite line endings on checkout; only the commands matter.
-        return new String(content, StandardCharsets.UTF_8).replace("\r\n", "\n");
-    }
 
     /**
-     * Launchers keep working across plugin versions because the engine holds the formatting logic.
-     * Warn only when an installed launcher differs from the packaged one, or the pre-0.1.1 Python hook remains.
+     * Keeps the hook launchers in .gradle/spotless-bridge identical to this plugin version's copies.
+     * A rewritten launcher may follow an older engine (0.1.0 does not accept --hook), so the recorded
+     * client is dropped and the next hook call prepares this plugin's engine through Gradle once.
      */
-    private static void warnIfHookOutdated(Project project) {
-        Path directory = hookDirectory(project);
+    private static void writeLaunchers(Path root) {
         try {
+            Path state = SharedDaemon.state(root);
+            boolean changed = false;
             for (String name : LAUNCHERS) {
-                Path installed = directory.resolve(name);
-                if (Files.isRegularFile(installed)
-                        && !normalized(Files.readAllBytes(installed)).equals(normalized(resource(name))))
-                    project.getLogger().warn("Spotless Bridge: {} differs from the launcher in this plugin version. "
-                            + "Run ./gradlew spotlessBridgeInstallHook to update it.", installed);
+                byte[] content;
+                try (InputStream input = SpotlessBridgePlugin.class.getResourceAsStream("/spotless-bridge/" + name)) {
+                    if (input == null) throw new IOException("Missing packaged resource spotless-bridge/" + name);
+                    content = input.readAllBytes();
+                }
+                Path launcher = state.resolve(name);
+                if (Files.isRegularFile(launcher) && Arrays.equals(Files.readAllBytes(launcher), content)) continue;
+                Path temporary = Files.createTempFile(state, name, ".tmp");
+                Files.write(temporary, content);
+                Files.move(temporary, launcher, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                changed = true;
             }
-            if (Files.isRegularFile(directory.resolve(LEGACY_SCRIPT)))
-                project.getLogger().warn("Spotless Bridge: {} is replaced by the launcher in this directory. "
-                        + "Run ./gradlew spotlessBridgeInstallHook and point your AI hook at {}.",
-                        directory.resolve(LEGACY_SCRIPT), directory.resolve(LAUNCHERS.get(0)));
+            state.resolve(LAUNCHERS.get(0)).toFile().setExecutable(true);
+            if (changed) Files.deleteIfExists(state.resolve("client-runtime.txt"));
         } catch (IOException e) {
-            project.getLogger().warn("Spotless Bridge: cannot check the hook launchers: {}", e.getMessage());
+            throw new GradleException("Cannot write the Spotless Bridge hook launchers", e);
         }
     }
 }

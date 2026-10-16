@@ -32,10 +32,6 @@ publishing.publications.withType(MavenPublication).configureEach {
 tasks.withType(Jar).configureEach {
     from('LICENSE') { into 'META-INF' }
 }
-// The hook launchers (src/main/resources/spotless-bridge) ship with their license for spotlessBridgeInstallHook.
-tasks.named('processResources', ProcessResources) {
-    into('spotless-bridge') { from('LICENSE') }
-}
 
 repositories { mavenCentral() }
 // Build with JDK 21 while keeping the engine, Gradle plugin and tests runnable on JDK 17.

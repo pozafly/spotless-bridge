@@ -36,31 +36,19 @@ Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.1"`을 
 기존 Spotless 버전과 규칙은 그대로 두세요. 다중 프로젝트 빌드에서는 Bridge를 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 그대로 둡니다.
 
-### 2. hook 런처 추가
+### 2. AI 도구 연결
 
-프로젝트의 Gradle 루트에서 플러그인으로 hook 런처를 생성합니다.
-
-```sh
-./gradlew spotlessBridgeInstallHook
-```
-
-macOS·Linux용 `tools/spotless-bridge/spotless-bridge`, Windows용 `spotless-bridge.cmd`와 `LICENSE`가 생성됩니다.
-다른 디렉터리를 쓰려면 `-PspotlessBridgeHookDir=<디렉터리>`를 추가하세요. 생성된 파일은 프로젝트에 커밋합니다.
-런처는 적용한 플러그인 버전의 엔진을 실행하기만 하므로, 플러그인을 업그레이드해도 다시 설치할 일은 거의 없습니다.
-런처를 갱신해야 하면 Bridge가 경고합니다. Windows 런처는 아직 CI에서 검증하지 않습니다.
-
-`ai-hook.py`를 쓰던 0.1.0에서 업그레이드한다면, 위처럼 런처를 설치하고 AI hook이 `spotless-bridge`를 실행하도록 고친 뒤
-`ai-hook.py`를 삭제하세요. 다음 hook 호출에서 Gradle로 새 엔진을 한 번 준비합니다.
-
-### 3. AI 도구 연결
-
-AI 도구가 Java 파일을 수정한 뒤 Gradle 루트와 변경한 파일을 넘겨 런처를 실행하도록 설정합니다.
+플러그인은 `.gradle/spotless-bridge/`에 작은 실행 스크립트(런처)를 두고, 빌드나 IntelliJ의 Gradle 동기화처럼
+Gradle이 실행될 때마다 최신 상태로 맞춥니다. 따로 설치하거나 커밋할 것은 없습니다.
+AI 도구가 Java 파일을 수정한 뒤 이 런처를 실행하도록 설정하세요.
 
 ```sh
-JAVA_HOME=/path/to/jdk tools/spotless-bridge/spotless-bridge "$PWD" \
+JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
   src/main/java/example/Customer.java \
   src/test/java/example/CustomerTest.java
 ```
+
+Windows에서는 `.gradle\spotless-bridge\spotless-bridge.cmd`를 사용합니다. Windows 런처는 아직 CI에서 검증하지 않습니다.
 
 예를 들어 Claude Code에서는 `.claude/settings.json`에 `PostToolUse` hook을 추가하면,
 Claude가 Java 파일을 수정할 때마다 바로 포맷합니다. 이 예시는 `jq`로 수정한 파일 경로를 읽으며,
@@ -75,7 +63,7 @@ Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk xargs -0 \"$CLAUDE_PROJECT_DIR/.gradle/spotless-bridge/spotless-bridge\""
           }
         ]
       }
@@ -87,6 +75,9 @@ Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
 다른 AI 도구도 같은 방식입니다. 작업에서 변경한 Java 파일을 모아 런처에 넘기면 됩니다.
 `JAVA_HOME`은 JDK 17 이상이어야 하며, 런처가 Gradle로 엔진을 준비할 때만 필요합니다.
 설정은 여기까지입니다. 첫 요청에서 daemon이 시작되고, 이후 요청은 같은 daemon을 재사용합니다.
+
+`tools/spotless-bridge/ai-hook.py`를 쓰던 0.1.0에서 업그레이드한다면, AI hook이 위 런처를 실행하도록 바꾸고
+기존 `tools/spotless-bridge/` 디렉터리를 삭제하세요.
 
 ## 어떻게 동작하나요?
 
@@ -166,9 +157,10 @@ CI는 모든 조합을 Ubuntu에서 실행하고, 그중 두 조합은 macOS에�
 
 ## AI hook 자세히 보기
 
-- 첫 번째 인자는 Gradle 루트이고, 나머지 인자는 각각 포맷할 파일입니다.
-  파일 경로는 Gradle 루트 기준 상대 경로와 절대 경로 모두 쓸 수 있습니다.
-  hook을 다른 디렉터리에서 실행한다면 런처와 Gradle 루트를 절대 경로로 지정하세요.
+- 인자는 각각 포맷할 파일이며, Gradle 루트 기준 상대 경로와 절대 경로 모두 쓸 수 있습니다.
+  런처는 자기 위치로 Gradle 루트를 찾으므로 어느 디렉터리에서 실행해도 됩니다.
+- 런처는 프로젝트에서 Gradle이 한 번 실행된 뒤에 생깁니다. 막 clone한 프로젝트라면
+  아무 Gradle 명령이나 한 번 실행하거나 IntelliJ로 프로젝트를 여세요.
 - 삭제된 파일은 빼고 실제로 있는 파일만 넘기세요. 파일 인자가 없으면 아무것도 하지 않습니다.
 - 명령이 0이 아닌 종료 코드를 반환하면 hook을 실패로 처리하세요.
 - 처음 실행할 때는 Gradle로 엔진을 준비합니다. 이후에는 엔진의 Java 클라이언트를 직접 실행하므로,
@@ -200,7 +192,7 @@ src/test/java/example/CustomerTest.java
 
 IntelliJ 플러그인은 **Reformat Code**를 실행하거나 Java 파일을 저장할 때 Spotless 규칙을 적용합니다.
 AI hook과 같은 daemon을 사용합니다. JetBrains Marketplace에는 추후 배포할 예정이며, 그전까지는
-[소스에서 빌드해 설치](docs/install-from-source.ko.md#3-intellij-플러그인-빌드와-설치)하세요.
+[소스에서 빌드해 설치](docs/install-from-source.ko.md#2-intellij-플러그인-빌드와-설치)하세요.
 AI hook은 IntelliJ 플러그인 없이도 사용할 수 있습니다.
 
 설치한 뒤에는 다음과 같이 설정합니다.

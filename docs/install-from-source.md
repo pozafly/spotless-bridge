@@ -32,23 +32,11 @@ pluginManagement {
 ```
 
 In `settings.gradle.kts`, use double quotes instead of single quotes.
-Then apply the plugin as described in the README's [Quick start](../README.md#quick-start).
+Then apply the plugin and connect your AI tool as described in the README's [Quick start](../README.md#quick-start).
+The hook launcher appears in `.gradle/spotless-bridge/` on the next Gradle run; there is nothing else to install.
 Once the plugin is on the Plugin Portal, remove the local `maven` entry.
 
-## 2. Install the AI hook launchers
-
-After applying the locally published plugin, let it write the hook launchers
-from your project's Gradle root:
-
-```sh
-./gradlew spotlessBridgeInstallHook
-```
-
-Commit the generated files. If Bridge warns that a launcher is out of date after you republish the
-plugin, run the task again. To connect the launcher to your AI tool, follow
-[Connect your AI tool](../README.md#3-connect-your-ai-tool) in the README.
-
-## 3. Build and install the IntelliJ plugin
+## 2. Build and install the IntelliJ plugin
 
 Build the IDE plugin ZIP from the checkout:
 

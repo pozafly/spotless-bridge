@@ -33,21 +33,11 @@ pluginManagement {
 ```
 
 `settings.gradle.kts`에서는 작은따옴표 대신 큰따옴표를 사용합니다.
-그다음 README의 [빠른 시작](../README.ko.md#빠른-시작)에 따라 플러그인을 적용합니다.
+그다음 README의 [빠른 시작](../README.ko.md#빠른-시작)에 따라 플러그인을 적용하고 AI 도구를 연결합니다.
+hook 런처는 다음 Gradle 실행 때 `.gradle/spotless-bridge/`에 생기므로 따로 설치할 것은 없습니다.
 Plugin Portal에 배포된 뒤에는 로컬 `maven` 항목을 제거하세요.
 
-## 2. AI hook 런처 설치
-
-로컬에 게시한 플러그인을 적용한 뒤, 사용할 프로젝트의 Gradle 루트에서 hook 런처를 생성합니다.
-
-```sh
-./gradlew spotlessBridgeInstallHook
-```
-
-생성된 파일을 프로젝트에 커밋하세요. 플러그인을 다시 게시한 뒤 런처를 갱신하라는 경고가 나오면 이 태스크를 다시 실행합니다.
-AI 도구에 연결하는 방법은 README의 [AI 도구 연결](../README.ko.md#3-ai-도구-연결)을 참고하세요.
-
-## 3. IntelliJ 플러그인 빌드와 설치
+## 2. IntelliJ 플러그인 빌드와 설치
 
 소스 디렉터리에서 IDE용 ZIP을 빌드합니다.
 
