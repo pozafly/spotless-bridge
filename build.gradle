@@ -38,22 +38,50 @@ repositories { mavenCentral() }
 java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 tasks.named('compileJava', JavaCompile) { options.release = 17 }
 tasks.named('compileTestJava', JavaCompile) { options.release = 17 }
-// The IDE SDK is only needed for pluginZip, not for engine/Gradle tests or CI.
+// IDE-only tasks use a pinned SDK; engine/Gradle checks do not require an IDE installation.
+def ideaSdkVersion = providers.gradleProperty('ideaSdkVersion').get()
+def ideaSdkBuild = providers.gradleProperty('ideaSdkBuild').get()
 def ideaHome = providers.gradleProperty('ideaHome').orElse('/Applications/IntelliJ IDEA.app/Contents')
+def ideaJavaHome = providers.provider {
+    def macRuntime = file("${ideaHome.get()}/jbr/Contents/Home")
+    macRuntime.isDirectory() ? macRuntime : file("${ideaHome.get()}/jbr")
+}
+def ideaLibraries = files(fileTree("${ideaHome.get()}/lib") { include '*.jar' })
 sourceSets {
     idea {
-        compileClasspath += sourceSets.main.output + files(fileTree("${ideaHome.get()}/lib") { include '*.jar' })
+        compileClasspath += sourceSets.main.output + ideaLibraries
+    }
+}
+configurations { pluginVerifier }
+dependencies {
+    pluginVerifier "org.jetbrains.intellij.plugins:verifier-cli:${providers.gradleProperty('pluginVerifierVersion').get()}:all@jar"
+}
+tasks.register('verifyIdeaSdk') {
+    group = 'verification'
+    description = 'Require the pinned IntelliJ IDEA SDK before compiling or verifying the adapter'
+    doLast {
+        def home = file(ideaHome.get())
+        def infoFile = new File(home, 'product-info.json')
+        if (!infoFile.isFile()) infoFile = new File(home, 'Resources/product-info.json')
+        if (!infoFile.isFile()) throw new GradleException("Set -PideaHome to IntelliJ IDEA ${ideaSdkVersion} (${ideaSdkBuild}); product-info.json was not found in ${home}")
+        def info = new groovy.json.JsonSlurper().parse(infoFile)
+        if (info.version != ideaSdkVersion || info.buildNumber != ideaSdkBuild || info.productCode != 'IU')
+            throw new GradleException("Expected IntelliJ IDEA IU ${ideaSdkVersion} (${ideaSdkBuild}); found ${info.productCode} ${info.version} (${info.buildNumber}) in ${home}")
+        logger.lifecycle("IntelliJ SDK: IU ${info.version} (${info.buildNumber})")
     }
 }
 tasks.named('compileIdeaJava', JavaCompile) {
+    dependsOn 'verifyIdeaSdk'
     options.fork = true
-    options.forkOptions.executable = "${ideaHome.get()}/jbr/Contents/Home/bin/javac"
+    options.forkOptions.executable = new File(ideaJavaHome.get(), 'bin/javac').absolutePath
     options.release = 21
     options.compilerArgs += ['-proc:none']
 }
+def ideaPluginVersion = project.version.toString()
 tasks.named('processIdeaResources') {
-    inputs.property('version', project.version)
-    filesMatching('META-INF/plugin.xml') { expand(version: project.version) }
+    inputs.property('version', ideaPluginVersion)
+    inputs.property('ideaSdkBuild', ideaSdkBuild)
+    filesMatching('META-INF/plugin.xml') { expand(version: ideaPluginVersion, ideaSdkBuild: ideaSdkBuild) }
 }
 tasks.register('engineDist', Sync) {
     dependsOn jar
@@ -92,3 +120,32 @@ tasks.register('selfTest', JavaExec) {
     workingDir rootDir
 }
 tasks.named('check') { dependsOn 'selfTest' }
+
+// IDE verification is explicit so the existing engine compatibility matrix remains SDK-independent.
+tasks.register('verifyIdeaPlugin', JavaExec) {
+    group = 'verification'
+    description = 'Run the pinned Plugin Verifier against the pinned IntelliJ SDK and packaged ZIP'
+    dependsOn 'verifyIdeaSdk', 'pluginZip'
+    classpath = configurations.pluginVerifier
+    mainClass = 'com.jetbrains.pluginverifier.PluginVerifierMain'
+    executable = new File(ideaJavaHome.get(), 'bin/java').absolutePath
+    maxHeapSize = '2g'
+    def reports = layout.buildDirectory.dir('reports/plugin-verifier')
+    args 'check-plugin', tasks.pluginZip.archiveFile.get().asFile.absolutePath, file(ideaHome.get()).absolutePath,
+            '-verification-reports-dir', reports.get().asFile.absolutePath,
+            '-runtime-dir', ideaJavaHome.get().absolutePath
+    doFirst { delete reports }
+    doLast {
+        // Verifier can exit zero with compatibility problems; inspect its documented report files too.
+        def verdicts = fileTree(reports).matching { include '**/verification-verdict.txt' }.files
+        if (verdicts.size() != 1) throw new GradleException("Plugin Verifier did not produce exactly one verdict; see ${reports.get().asFile}")
+        def failures = fileTree(reports).matching {
+            include '**/compatibility-problems.txt', '**/invalid-plugin.txt', '**/internal-api-usages.txt',
+                    '**/non-extendable-api-usages.txt', '**/override-only-usages.txt'
+        }.files.findAll { !it.text.trim().isEmpty() }
+        if (!failures.isEmpty()) throw new GradleException("Plugin Verifier failed: ${failures*.absolutePath.join(', ')}")
+        def verdict = verdicts.first().text.trim()
+        if (!verdict.startsWith('Compatible')) throw new GradleException("Plugin Verifier did not confirm compatibility: ${verdict}")
+        logger.lifecycle("Plugin Verifier verdict: ${verdict}")
+    }
+}

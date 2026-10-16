@@ -52,7 +52,7 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
         // Import rewrites require a whole-file, non-whitespace-only formatting request.
         if (request.canChangeWhitespaceOnly() || request.isQuickFormat()) return null;
         Project project = request.getContext().getProject();
-        Document document = ReadAction.compute(() -> PsiDocumentManager.getInstance(project)
+        Document document = ReadAction.computeBlocking(() -> PsiDocumentManager.getInstance(project)
                 .getDocument(request.getContext().getContainingFile()));
         if (document == null) return null;
         long stamp = document.getModificationStamp();
@@ -68,7 +68,7 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
                 }
                 try {
                     String formatted = project.getService(ProjectEngine.class).format(sourceFile, source);
-                    ReadAction.run(() -> {
+                    ReadAction.runBlocking(() -> {
                         boolean current = !cancelled.get()
                                 && !project.isDisposed()
                                 && project.getService(FormatterSettings.class).getState().enabled
