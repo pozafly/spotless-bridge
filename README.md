@@ -141,8 +141,7 @@ Update your Gradle wrapper and Spotless plugin to the ranges above, and run Grad
   The error includes the detected version and the accepted range.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
 
-The current 0.1.1 source is tested with these combinations. JDK 17 support is not included in the existing `v0.1.0` release,
-which still requires JDK 21; use the [source installation guide](docs/install-from-source.md) until the updated version is published:
+Bridge 0.1.1 is tested with these combinations:
 
 | JDK | Gradle | Spotless verification |
 | --- | --- | --- |
@@ -159,8 +158,8 @@ which still requires JDK 21; use the [source installation guide](docs/install-fr
 Other combinations within the accepted version ranges run with a warning when a Gradle or Spotless version is outside the verified list. JDK 25 has not been tested with
 Gradle 8.x or 9.0.0. The suite covers Groovy and Kotlin DSL, output parity with plain Spotless,
 new and excluded files, configuration refresh, shared daemon reuse, concurrent requests, and hooks
-running without an IDE. All nine combinations were checked locally on macOS; the Ubuntu CI matrix is configured
-for the same combinations. GitHub CI must be rerun after these changes are pushed.
+running without an IDE. CI runs every combination on Ubuntu
+and two of them on macOS.
 
 ## More on the AI hook
 

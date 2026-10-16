@@ -140,8 +140,7 @@ Gradle wrapper와 Spotless 플러그인 버전을 위 범위에 맞추고, Gradl
   경고를 표시하고 계속 실행합니다. 범위를 벗어나면 포맷 전에 중단하며, 감지한 버전과 허용 범위를 오류에 표시합니다.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
 
-현재 0.1.1 소스는 다음 조합으로 검증했습니다. 기존 `v0.1.0` 릴리스에는 JDK 17 지원이 없으며 JDK 21이 필요합니다.
-업데이트 버전이 게시되기 전에는 [소스 설치 안내](docs/install-from-source.ko.md)를 사용하세요.
+Bridge 0.1.1은 다음 조합으로 검증했습니다.
 
 | JDK | Gradle | Spotless 검증 범위 |
 | --- | --- | --- |
@@ -157,8 +156,8 @@ Gradle wrapper와 Spotless 플러그인 버전을 위 범위에 맞추고, Gradl
 
 허용 범위 안에서도 검증 목록에 없는 Gradle·Spotless 버전은 경고를 표시하고 실행합니다. JDK 25와 Gradle 8.x 또는 9.0.0의 조합은
 검증하지 않았습니다. 검사 항목은 Groovy/Kotlin DSL, 일반 Spotless와의 결과 일치, 신규·제외 파일, 설정 갱신,
-공용 daemon 재사용, 동시 요청, IDE 없이 실행하는 hook입니다. 아홉 조합은 로컬 macOS에서 확인했으며,
-Ubuntu CI도 같은 조합을 실행하도록 구성했습니다. 이번 변경을 push한 뒤 GitHub CI에서 다시 확인해야 합니다.
+공용 daemon 재사용, 동시 요청, IDE 없이 실행하는 hook입니다.
+CI는 모든 조합을 Ubuntu에서 실행하고, 그중 두 조합은 macOS에서도 실행합니다.
 
 ## AI hook 자세히 보기
 

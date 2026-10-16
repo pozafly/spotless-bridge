@@ -100,9 +100,8 @@ Spotless 내부 API의 변경을 미리 확인합니다.
 
 Bridge 자체는 JDK 21과 저장소에 포함된 Gradle 8.14.3 wrapper로 빌드합니다. 테스트에서는 Java 17 대상으로 빌드한
 같은 엔진을 선택한 소비 프로젝트 JDK로 실행하며, Gradle·daemon·worker·hook 모두 이 JDK를 사용합니다.
-Ubuntu CI는 JDK 17·21에서 각각 네 Gradle 버전을, JDK 25에서 Gradle 9.8.1을 검사하도록 구성했습니다.
-[호환 조합 표](../README.ko.md#요구-사항과-호환성)의 총 아홉 조합을 로컬 macOS에서 확인했습니다
-(Zulu 17.0.20.1, Corretto 21.0.6, Temurin 25.0.4.1). 이번 변경의 GitHub CI 실행은 아직 하지 않았습니다.
+Ubuntu CI는 JDK 17·21에서 각각 네 Gradle 버전을, JDK 25에서 Gradle 9.8.1을 검사합니다.
+[호환 조합 표](../README.ko.md#요구-사항과-호환성)의 아홉 조합 전체입니다.
 Google Java Format 테스트 버전은 JDK 17에서 1.28.0, JDK 21·25에서 1.30.0으로 고정합니다.
 엔진과 테스트는 `--release 17`로 컴파일하며, IntelliJ adapter는 IDE SDK에 맞춰 `--release 21`을 유지합니다.
 포맷용 외부 JDK 17을 선택하는 것과 IntelliJ 자체 실행 JDK의 요구사항은 별개입니다.
