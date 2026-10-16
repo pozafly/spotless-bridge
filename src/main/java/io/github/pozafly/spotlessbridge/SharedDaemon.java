@@ -284,12 +284,14 @@ public final class SharedDaemon {
 
     private static void waitStopped(Properties endpoint) throws Exception {
         // Never kill a PID from a state file: it may have been recycled by the OS.
+        ProcessHandle process = ProcessHandle.of(Long.parseLong(endpoint.getProperty("pid"))).orElse(null);
         long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < end) {
             try {
                 request(endpoint, "ping", "", "", "");
             } catch (IOException stopped) {
-                return;
+                // Windows keeps the runtime JAR locked until the JVM actually exits.
+                if (process == null || !process.isAlive()) return;
             }
             Thread.sleep(50);
         }

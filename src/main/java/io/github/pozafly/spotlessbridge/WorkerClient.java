@@ -145,8 +145,17 @@ public final class WorkerClient implements AutoCloseable {
     public void close() {
         closed = true;
         Session session = active.getAndSet(null);
-        if (session != null) session.process.destroyForcibly();
         timer.shutdownNow();
+        if (session != null) {
+            session.process.destroyForcibly();
+            try {
+                if (!session.process.waitFor(5, TimeUnit.SECONDS))
+                    throw new IllegalStateException("Formatter worker did not stop");
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while stopping formatter worker", interrupted);
+            }
+        }
     }
 
     /**
