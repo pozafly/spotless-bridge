@@ -7,6 +7,7 @@ import java.nio.file.*;
 import java.util.List;
 import java.util.Map;
 import org.gradle.api.*;
+import org.gradle.util.GradleVersion;
 
 /** The root project owns the engine version and exports its own Spotless configuration. */
 public final class SpotlessBridgePlugin implements Plugin<Project> {
@@ -23,6 +24,16 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
     public void apply(Project project) {
         if (project != project.getRootProject())
             throw new GradleException("Apply io.github.pozafly.spotlessbridge to the root project only");
+        String gradleVersion = project.getGradle().getGradleVersion();
+        GradleVersion baseVersion = GradleVersion.version(gradleVersion).getBaseVersion();
+        if (baseVersion.compareTo(GradleVersion.version("8.14.3")) < 0
+                || baseVersion.compareTo(GradleVersion.version("10.0")) >= 0)
+            throw new GradleException("Spotless Bridge does not support Gradle " + gradleVersion
+                    + ". Supported Gradle range: >= 8.14.3 and < 10.0. "
+                    + "Use a Gradle wrapper in this range or update Spotless Bridge.");
+        if (!java.util.List.of("8.14.3", "8.14.6", "9.0.0", "9.8.1").contains(gradleVersion))
+            project.getLogger().warn("Spotless Bridge: Gradle {} is within the supported range but has not been verified. "
+                    + "Verified Gradle versions: 8.14.3, 8.14.6, 9.0.0, 9.8.1.", gradleVersion);
         project.getTasks().register("spotlessBridgeStart", task -> {
             task.setGroup("formatting");
             task.setDescription("Export current Spotless settings and start or refresh the project daemon");
