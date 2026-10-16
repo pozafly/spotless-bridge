@@ -18,7 +18,7 @@ IDE 포맷 규칙을 따로 맞추거나 전역 서비스를 설치할 필요가
 ## 빠른 시작
 
 Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 Gradle wrapper가 필요합니다.
-Gradle을 실행할 **JDK 21 이상**, AI hook에 사용할 **Python 3**도 준비하세요.
+Gradle을 실행할 **JDK 17 이상**, AI hook에 사용할 **Python 3**도 준비하세요.
 
 ### 1. 플러그인 적용
 
@@ -112,17 +112,25 @@ daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다�
 
 ## 요구 사항과 호환성
 
-- Gradle을 실행하는 JDK, 즉 `./gradlew`나 hook을 실행할 때의 `JAVA_HOME`이 **JDK 21 이상**이어야 합니다.
+- Gradle을 실행하는 JDK, 즉 `./gradlew`나 hook을 실행할 때의 `JAVA_HOME`이 **JDK 17 이상**이어야 합니다.
+- 포매터 라이브러리가 Bridge보다 높은 JDK를 요구할 수 있습니다. 테스트는 JDK 17에서 **Google Java Format 1.28.0**,
+  JDK 21·25에서 **1.30.0**을 사용합니다. 1.30.0은 JDK 21 이상이 필요하며, Bridge는 프로젝트가 선택한 버전을
+  자동으로 낮추지 않고 호환 오류를 전달합니다. Palantir 2.97.0·2.96.0과 테스트의 Eclipse 설정도 검사합니다.
 - Bridge는 **Gradle 프로젝트의 Java 파일을 전체 파일 단위로** 포맷합니다. Maven 지원은 준비 중이며, 다른 언어는 지원하지 않습니다.
 - Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, 직렬화할 수 없는 포맷 단계는 지원하지 않습니다.
   빌드에서 configuration cache를 켜 두었다면 Bridge 태스크는 `--no-configuration-cache`로 실행하세요.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
 
-Bridge 0.1.1은 다음 조합으로 검증했습니다.
+현재 0.1.1 소스는 다음 조합으로 검증했습니다. 기존 `v0.1.0` 릴리스에는 JDK 17 지원이 없으며 JDK 21이 필요합니다.
+업데이트 버전이 게시되기 전에는 [소스 설치 안내](docs/install-from-source.ko.md)를 사용하세요.
 
 | JDK | Gradle | Spotless 검증 범위 |
 | --- | --- | --- |
-| 21 | 8.14.3 | 8.10.2 전체 회귀 검사, 8.0.0 버전 전환·포맷 결과 일치 검사 |
+| 17 | 8.14.3 | 8.10.2 전체 회귀 검사, 8.0.0 버전 전환·포맷 결과 일치 검사 |
+| 17 | 8.14.6 | 동일한 검사 |
+| 17 | 9.0.0 | 동일한 검사 |
+| 17 | 9.8.1 | 동일한 검사 |
+| 21 | 8.14.3 | 동일한 검사 |
 | 21 | 8.14.6 | 동일한 검사 |
 | 21 | 9.0.0 | 동일한 검사 |
 | 21 | 9.8.1 | 동일한 검사 |
@@ -130,7 +138,8 @@ Bridge 0.1.1은 다음 조합으로 검증했습니다.
 
 다른 버전에서도 동작할 수 있지만, 검증한 조합은 위 표뿐입니다. JDK 25와 Gradle 8.x 또는 9.0.0의 조합은
 검증하지 않았습니다. 검사 항목은 Groovy/Kotlin DSL, 일반 Spotless와의 결과 일치, 신규·제외 파일, 설정 갱신,
-공용 daemon 재사용, 동시 요청, IDE 없이 실행하는 hook입니다.
+공용 daemon 재사용, 동시 요청, IDE 없이 실행하는 hook입니다. 아홉 조합은 로컬 macOS에서 확인했으며,
+Ubuntu CI도 같은 조합을 실행하도록 구성했습니다. 이번 변경을 push한 뒤 GitHub CI에서 다시 확인해야 합니다.
 
 ## AI hook 자세히 보기
 
@@ -173,7 +182,7 @@ AI hook은 IntelliJ 플러그인 없이도 사용할 수 있습니다.
 
 설치한 뒤에는 다음과 같이 설정합니다.
 
-1. **Settings → Tools → Spotless Bridge**에서 플러그인을 켜고 JDK 21 경로를 지정합니다.
+1. **Settings → Tools → Spotless Bridge**에서 플러그인을 켜고 포매터 요구사항을 만족하는 JDK 17 이상 경로를 지정합니다. hook과 같은 JDK를 사용하세요.
 2. 필요하면 Gradle 루트를 지정합니다. AI hook과 같은 루트를 사용하세요.
 3. Java 소스 파일에서 **Reformat Code**를 실행하면 Spotless 규칙으로 포맷됩니다.
 4. 저장할 때 자동으로 포맷하려면 **Tools → Actions on Save → Reformat code**에서 **Java / Whole file**을 선택합니다.

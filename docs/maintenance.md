@@ -10,6 +10,10 @@
 인코딩, 줄바꿈 정책, 대상 파일을 읽습니다. 설정과 JAR 경로를 내보낸 뒤 daemon에 전달합니다.
 `Worker`는 실제 프로젝트 라이브러리의 `Formatter`·`DirtyState`를 복원·호출합니다.
 
+최소 실행 JDK는 17입니다. Java 17 대상 바이트코드와 Gradle Module Metadata의 JVM 버전 속성으로 선언하며,
+낮은 JDK에서는 Gradle이 플러그인을 로드하기 전에 현재·최소 버전과 JDK 변경 안내를 출력합니다.
+따라서 플러그인 클래스 안에 도달할 수 없는 JDK 검사를 따로 두지 않습니다.
+
 Spotless 내부 API 변경이나 직렬화 불가 단계는 실패할 수 있습니다. 임의 버전·이전 설정으로 대체하지 않습니다.
 `ratchetFrom`은 지원하지 않습니다. Gradle configuration cache와 isolated projects도 지원하지 않으며 plugin compatibility 메타데이터에 둘 다 `false`로 선언합니다.
 
@@ -43,13 +47,24 @@ JDK 21을 유지하고 소비 프로젝트 Gradle 버전만 바꾸는 호환성 
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
 ```
 
-`testGradleVersion`의 기본값은 `8.14.3`입니다. CI는 `8.14.3`, `8.14.6`, `9.0.0`, `9.8.1`을 각각 검사합니다.
+`testGradleVersion`의 기본값은 `8.14.3`입니다. CI는 JDK 17·21에서 각각 `8.14.3`, `8.14.6`, `9.0.0`, `9.8.1`을,
+JDK 25에서 `9.8.1`을 검사하도록 구성합니다. 총 아홉 조합입니다.
 Bridge 자체 빌드는 저장소의 8.14.3 wrapper를 유지하고, Groovy/Kotlin 임시 소비 프로젝트에만 지정한
 배포본 URL을 설정합니다. 각 소비 프로젝트는 `--version` 결과를 확인한 뒤 회귀 검사를 실행합니다.
 Spotless 8.10.2로 전체 검사를 실행하고, 같은 Gradle에서 8.0.0 전환·복원 시 결과 일치와 worker 교체도 검사합니다.
 8.0.0 전체 기능 조합이나 모든 Gradle 8.x/9.x를 검증한 것은 아닙니다.
 
-JDK 25는 Gradle 9.8.1과 함께 검사합니다. 빌드 JDK와 Java 21 바이트코드는 유지합니다.
+빌드 JDK는 21로 유지하고 엔진·플러그인·테스트를 `--release 17`로 컴파일합니다.
+IntelliJ adapter만 IDE SDK에 맞춰 `--release 21`을 유지합니다.
+
+JDK 17 검사는 다음과 같습니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
+  -PtestGradleVersion=8.14.3 -PtestJavaHome=/path/to/jdk17
+```
+
+JDK 25는 Gradle 9.8.1과 함께 검사합니다.
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
@@ -60,8 +75,15 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
 기본값은 빌드 JVM의 홈 경로입니다. 테스트 프로세스, 소비 Gradle, daemon, worker와 hook이 같은 JDK를 사용하며,
 테스트는 환경 변수·실행 JVM 일치, daemon endpoint의 JDK, hook runtime의 JDK를 검사합니다.
 CI는 소비 JDK를 준비한 뒤 빌드 JDK를 21로 설정하고, 소비 JDK 경로를 `testJavaHome`으로 명시합니다.
-JDK 25 조합은 Temurin 25.0.4.1(macOS)로 검증했으며 기존 JDK 21 엔진 JAR의 SHA-256과
-class major version 65가 유지됨을 확인했습니다. 임의의 상위 JDK나 Java 25의 모든 문법 지원을 의미하지 않습니다.
+아홉 조합을 로컬 macOS의 Zulu 17.0.20.1, Corretto 21.0.6, Temurin 25.0.4.1로 검증합니다.
+엔진 class major version은 61이며, Gradle Module Metadata의 JVM 버전은 17입니다.
+같은 엔진 JAR를 모든 소비 JDK에서 사용합니다. 이번 변경의 GitHub CI 실행은 push 후 별도 확인해야 합니다.
+임의의 상위 JDK나 Java 25의 모든 문법 지원을 의미하지 않습니다.
+
+Google Java Format은 JDK 17 테스트에서 1.28.0, JDK 21·25에서 1.30.0을 사용합니다.
+JDK 17에서 1.30.0을 지정하면 실패하며 파일을 보존하는지, 1.28.0으로 복구하면 정상 포맷되는지도 검사합니다.
+이 분기는 테스트 fixture에만 적용합니다. 운영 엔진은 프로젝트가 선택한 포매터 버전을 바꾸지 않습니다.
+기존 공개 `v0.1.0` 태그·Release는 Java 21 대상으로 남겨 두며 이 변경으로 교체하지 않습니다.
 
 
 `check`는 `build/repository`에 marker와 구현 JAR를 게시하고, 임시 소비 프로젝트에서 실제로 해석합니다.

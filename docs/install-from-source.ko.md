@@ -77,7 +77,14 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
 ```
 
-컴파일은 JDK 21로 하고 전체 호환성 검사만 JDK 25로 실행하려면 다음과 같이 지정합니다.
+컴파일은 JDK 21로 하고 전체 호환성 검사를 JDK 17로 실행하려면 다음과 같이 지정합니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
+  -PtestGradleVersion=8.14.3 -PtestJavaHome=/path/to/jdk17
+```
+
+JDK 25는 Gradle 9.8.1과 함께 검사합니다.
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
@@ -87,9 +94,13 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
 `testJavaHome`을 지정하지 않으면 빌드 JVM의 홈 경로를 사용합니다. 이 값은 hook 최초 실행 시의 `JAVA_HOME`에도 적용되며,
 시스템 기본 Java나 엔진의 최소 실행 버전은 바꾸지 않습니다.
 
-Bridge 자체는 JDK 21과 저장소에 포함된 Gradle 8.14.3 wrapper로 빌드합니다. 테스트에서는 Java 21 대상으로 빌드한
+Bridge 자체는 JDK 21과 저장소에 포함된 Gradle 8.14.3 wrapper로 빌드합니다. 테스트에서는 Java 17 대상으로 빌드한
 같은 엔진을 선택한 소비 프로젝트 JDK로 실행하며, Gradle·daemon·worker·hook 모두 이 JDK를 사용합니다.
-Ubuntu CI에서는 [호환 조합 표](../README.ko.md#요구-사항과-호환성)의 JDK 21 조합 네 개에 JDK 25·Gradle 9.8.1 조합을 더해 검사합니다.
-JDK 25 조합은 macOS 로컬 환경(Temurin 25.0.4.1)에서도 검증했습니다.
+Ubuntu CI는 JDK 17·21에서 각각 네 Gradle 버전을, JDK 25에서 Gradle 9.8.1을 검사하도록 구성했습니다.
+[호환 조합 표](../README.ko.md#요구-사항과-호환성)의 총 아홉 조합을 로컬 macOS에서 확인했습니다
+(Zulu 17.0.20.1, Corretto 21.0.6, Temurin 25.0.4.1). 이번 변경의 GitHub CI 실행은 아직 하지 않았습니다.
+Google Java Format 테스트 버전은 JDK 17에서 1.28.0, JDK 21·25에서 1.30.0으로 고정합니다.
+엔진과 테스트는 `--release 17`로 컴파일하며, IntelliJ adapter는 IDE SDK에 맞춰 `--release 21`을 유지합니다.
+포맷용 외부 JDK 17을 선택하는 것과 IntelliJ 자체 실행 JDK의 요구사항은 별개입니다.
 
 IntelliJ SDK는 `pluginZip`에만 필요합니다. 구현 상세, 회귀 검사, 게시 절차는 [유지보수 문서](maintenance.md)를 참고하세요.
