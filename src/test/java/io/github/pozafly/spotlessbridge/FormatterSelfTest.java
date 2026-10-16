@@ -154,7 +154,7 @@ public final class FormatterSelfTest {
                 formatter.format(file, SOURCE);
                 throw new AssertionError("invalid Gradle config must fail closed");
             } catch (IOException expected) {
-                check(expected.getMessage().contains("설정"), "configuration failure diagnostic");
+                check(expected.getMessage().contains("configuration"), "configuration failure diagnostic");
             }
             Files.writeString(build, initial);
             check(formatter.format(file, SOURCE).contains("import java.util.List;"), "recovery after config repair");
@@ -236,14 +236,14 @@ public final class FormatterSelfTest {
                 formatter.format(file, SOURCE);
                 throw new AssertionError("project without Spotless must fail");
             } catch (IOException expected) {
-                check(expected.getMessage().contains("설정"), "missing Spotless diagnostic");
+                check(expected.getMessage().contains("configuration"), "missing Spotless diagnostic");
             }
             Files.writeString(build, "plugins { id 'java'; id 'com.diffplug.spotless' version '" + version + "' }\n");
             try {
                 formatter.format(file, SOURCE);
                 throw new AssertionError("Spotless without Java configuration must fail");
             } catch (IOException expected) {
-                check(expected.getMessage().contains("설정"), "missing Java configuration diagnostic");
+                check(expected.getMessage().contains("configuration"), "missing Java configuration diagnostic");
             }
             Files.writeString(build, initial + "\nspotless { ratchetFrom 'HEAD' }\n");
             try {

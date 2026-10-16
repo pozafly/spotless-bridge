@@ -101,9 +101,8 @@ against the latest Spotless release to catch changes in the Spotless internal AP
 
 Bridge itself is built with JDK 21 and the checked-in Gradle 8.14.3 wrapper. Tests run the same
 Java 17-targeted engine on the selected consumer JDK, which covers Gradle, the daemon, workers, and hooks.
-Ubuntu CI is configured for four Gradle versions each on JDK 17 and 21, plus JDK 25 with Gradle 9.8.1: nine combinations
-from the [compatibility table](../README.md#requirements-and-compatibility). All nine were checked locally on macOS
-(Zulu 17.0.20.1, Corretto 21.0.6, and Temurin 25.0.4.1); GitHub CI still needs to run for these changes.
+Ubuntu CI runs four Gradle versions each on JDK 17 and 21, plus JDK 25 with Gradle 9.8.1: the nine combinations
+in the [compatibility table](../README.md#requirements-and-compatibility).
 Google Java Format is pinned to 1.28.0 in JDK 17 fixtures and 1.30.0 in JDK 21/25 fixtures.
 The engine and tests compile with `--release 17`; the IntelliJ adapter keeps `--release 21` for its IDE SDK.
 Selecting an external JDK 17 for formatting does not change IntelliJ's own runtime requirements.

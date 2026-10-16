@@ -63,7 +63,7 @@ public final class GradleFormatter implements AutoCloseable {
         fingerprint = fingerprint();
         String formatted = SharedDaemon.format(endpoint, canonical, source);
         if (closed || (fingerprint != null && !fingerprint.equals(fingerprint())))
-            throw new IOException("Spotless 설정이 포맷 도중 변경되었습니다. 다시 저장하세요.");
+            throw new IOException("Spotless configuration changed while formatting. Save the file again.");
         return formatted;
     }
 
@@ -153,7 +153,7 @@ public final class GradleFormatter implements AutoCloseable {
         Path log = Files.createTempFile(cacheDirectory, "gradle-start-", ".log");
         Path java = javaHome.resolve("bin").resolve(isWindows() ? "java.exe" : "java");
         Path wrapper = root.resolve("gradle/wrapper/gradle-wrapper.jar");
-        if (!Files.isRegularFile(wrapper)) throw new IOException("Gradle wrapper JAR를 찾을 수 없습니다: " + wrapper);
+        if (!Files.isRegularFile(wrapper)) throw new IOException("Gradle wrapper JAR not found: " + wrapper);
         ProcessBuilder builder = new ProcessBuilder(
                         java.toString(),
                         "-classpath",
@@ -175,7 +175,7 @@ public final class GradleFormatter implements AutoCloseable {
         try {
             if (!process.waitFor(120, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                throw new IOException("Spotless Bridge 설정을 120초 안에 가져오지 못했습니다. 로그: " + log);
+                throw new IOException("Spotless Bridge could not load the Spotless configuration within 120 seconds. Log: " + log);
             }
             String versionError = "";
             for (String line : Files.readAllLines(log)) {
@@ -184,17 +184,17 @@ public final class GradleFormatter implements AutoCloseable {
                 if (message.contains("Spotless Bridge does not support")) versionError = message;
             }
             if (process.exitValue() != 0)
-                throw new IOException("Spotless Bridge 설정을 가져오지 못했습니다. 이전 규칙은 적용하지 않습니다. 로그: " + log
+                throw new IOException("Spotless Bridge could not load the Spotless configuration; previous rules were not applied. Log: " + log
                         + (versionError.isEmpty() ? "" : "\n" + versionError));
         } catch (InterruptedException interrupted) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
-            throw new IOException("Spotless Bridge 설정 불러오기가 취소되었습니다.", interrupted);
+            throw new IOException("Loading the Spotless configuration was cancelled.", interrupted);
         } finally {
             exportProcess.compareAndSet(process, null);
         }
         if (closed) throw new IOException("Formatter is stopped");
-        if (!before.equals(fingerprint())) throw new IOException("설정을 가져오는 동안 빌드 파일이 변경되었습니다. 다시 저장하세요.");
+        if (!before.equals(fingerprint())) throw new IOException("Build files changed while the Spotless configuration was loading. Save the file again.");
         Properties imported = SharedDaemon.metadata(SharedDaemon.endpoint(root));
         watchedRoots = SharedDaemon.watchedRoots(imported);
         metadata = imported;

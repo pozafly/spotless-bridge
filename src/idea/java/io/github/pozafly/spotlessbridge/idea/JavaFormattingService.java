@@ -86,7 +86,7 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
                             || !project.getService(FormatterSettings.class).getState().enabled)
                         request.onTextReady(null);
                     else
-                        request.onError(getName(), failure.getMessage() == null ? "포맷에 실패했습니다." : failure.getMessage());
+                        request.onError(getName(), failure.getMessage() == null ? "Formatting failed." : failure.getMessage());
                 }
             }
 

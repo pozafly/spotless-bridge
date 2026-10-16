@@ -35,7 +35,7 @@ public final class ProjectEngine implements Disposable {
             while (root != null && !Files.isRegularFile(root.resolve("gradle/wrapper/gradle-wrapper.jar")))
                 root = root.getParent();
             if (root == null)
-                throw new IOException("Gradle wrapper를 찾을 수 없습니다. Spotless Bridge 설정에서 Gradle 루트를 지정하세요.");
+                throw new IOException("Gradle wrapper not found. Set the Gradle root in Spotless Bridge settings.");
             root = root.toRealPath();
         }
         GradleFormatter existing = builds.get(root);
@@ -46,7 +46,7 @@ public final class ProjectEngine implements Disposable {
                 Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
                 return sdk == null ? null : sdk.getHomePath();
             });
-        if (home == null || home.isBlank()) throw new IOException("Spotless Bridge 설정에서 JDK 17 이상 경로를 지정하세요. 포매터가 요구하는 JDK 버전도 확인하세요.");
+        if (home == null || home.isBlank()) throw new IOException("Set a JDK 17 or newer home in Spotless Bridge settings, and check the JDK version your formatter requires.");
         List<Path> extraWatch = new ArrayList<>();
         for (String line : settings.extraWatch.lines().toList())
             if (!line.isBlank()) extraWatch.add(root.resolve(line.trim()).normalize());
@@ -57,7 +57,7 @@ public final class ProjectEngine implements Disposable {
                 () -> NotificationGroupManager.getInstance()
                         .getNotificationGroup("Spotless Bridge")
                         .createNotification(
-                                "Spotless Bridge 설정 불러오는 중", "빌드 설정을 평가한 뒤 새 규칙으로 포맷합니다.", NotificationType.INFORMATION)
+                                "Loading Spotless configuration", "Formatting continues with the new rules after the build configuration is evaluated.", NotificationType.INFORMATION)
                         .notify(project));
         created.refresh();
         builds.put(root, created);

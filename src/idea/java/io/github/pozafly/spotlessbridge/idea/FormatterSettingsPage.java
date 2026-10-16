@@ -24,23 +24,23 @@ public final class FormatterSettingsPage implements Configurable {
     @Override
     public JComponent createComponent() {
         JPanel panel = new JPanel(new GridLayout(0, 1, 0, 8));
-        enabled = new JCheckBox("이 프로젝트에서 Spotless Bridge 사용");
+        enabled = new JCheckBox("Use Spotless Bridge in this project");
         javaHome = new JTextField();
         panel.add(enabled);
-        panel.add(new JLabel("JDK 17 이상 홈 경로 (포매터 요구 버전 확인, 비워두면 프로젝트 SDK 사용)"));
+        panel.add(new JLabel("JDK home, 17 or newer (check your formatter's requirement; empty uses the project SDK)"));
         panel.add(javaHome);
         gradleRoot = new JTextField();
         extraWatch = new JTextArea(3, 50);
-        panel.add(new JLabel("Gradle 루트 경로 (비우면 해당 Java 파일에서 가장 가까운 wrapper 탐색)"));
+        panel.add(new JLabel("Gradle root (empty finds the nearest wrapper from each Java file)"));
         panel.add(gradleRoot);
-        panel.add(new JLabel("추가 변경 감지 경로 (외부 스크립트/설정, 한 줄에 하나, 상대 경로는 Gradle 루트 기준)"));
+        panel.add(new JLabel("Extra watched paths (external scripts or settings, one per line, relative to the Gradle root)"));
         panel.add(new JScrollPane(extraWatch));
-        JButton reload = new JButton("다음 포맷 시 Spotless 설정 다시 불러오기");
+        JButton reload = new JButton("Reload Spotless configuration on next format");
         reload.addActionListener(
                 event -> project.getService(ProjectEngine.class).stop());
         panel.add(reload);
-        panel.add(new JLabel("저장 시 실행: Tools > Actions on Save > Reformat code (Java, Whole file)"));
-        panel.add(new JLabel("기존 Formo, Java Save Formatter, Run spotless, 다른 Java 포매터는 끈 후 사용하세요."));
+        panel.add(new JLabel("Format on save: Tools > Actions on Save > Reformat code (Java, Whole file)"));
+        panel.add(new JLabel("Turn off other Java formatters on save, such as Java Save Formatter or Run spotless."));
         JPanel container = new JPanel(new BorderLayout());
         container.add(panel, BorderLayout.NORTH);
         reset();
