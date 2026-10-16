@@ -27,28 +27,25 @@ Add Spotless Bridge to the `plugins` block of your **root** `build.gradle`, next
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // your existing Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
+    id 'io.github.pozafly.spotlessbridge' version '0.1.1'
 }
 ```
 
-In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.0"`.
+In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.1"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
 ### 2. Add the hook script
 
-From your project's Gradle root, download the hook script and its license for the same version:
+From your project's Gradle root, let the plugin write the hook script and its license:
 
 ```sh
-bridge_version=0.1.0
-mkdir -p tools/spotless-bridge
-curl -fsSL -o tools/spotless-bridge/ai-hook.py \
-  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/scripts/ai-hook.py"
-curl -fsSL -o tools/spotless-bridge/LICENSE \
-  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/LICENSE"
+./gradlew spotlessBridgeInstallHook
 ```
 
-Commit both files. When you upgrade the plugin, download the script for the new version too.
+This writes `tools/spotless-bridge/ai-hook.py` and `LICENSE` for the plugin version you applied.
+Add `-PspotlessBridgeHookDir=<dir>` to use another directory. Commit both files.
+After upgrading the plugin, run the task again; Bridge warns when the script and plugin versions differ.
 
 ### 3. Connect your AI tool
 
@@ -121,7 +118,7 @@ The daemon shuts down after 30 minutes without requests and starts again on the 
   Run Bridge tasks with `--no-configuration-cache` if your build enables the configuration cache.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
 
-Bridge 0.1.0 is tested with these combinations:
+Bridge 0.1.1 is tested with these combinations:
 
 | JDK | Gradle | Spotless verification |
 | --- | --- | --- |

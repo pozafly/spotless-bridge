@@ -36,18 +36,15 @@ pluginManagement {
 그다음 README의 [빠른 시작](../README.ko.md#빠른-시작)에 따라 플러그인을 적용합니다.
 Plugin Portal에 배포된 뒤에는 로컬 `maven` 항목을 제거하세요.
 
-## 2. AI hook 스크립트 복사
+## 2. AI hook 스크립트 설치
 
-사용할 프로젝트의 Gradle 루트에서, 같은 소스 디렉터리의 스크립트와 라이선스를 복사합니다.
+로컬에 게시한 플러그인을 적용한 뒤, 사용할 프로젝트의 Gradle 루트에서 hook 스크립트와 라이선스를 생성합니다.
 
 ```sh
-bridge_source=/path/to/spotless-bridge
-mkdir -p tools/spotless-bridge
-cp "$bridge_source/scripts/ai-hook.py" tools/spotless-bridge/ai-hook.py
-cp "$bridge_source/LICENSE" tools/spotless-bridge/LICENSE
+./gradlew spotlessBridgeInstallHook
 ```
 
-두 파일을 프로젝트에 커밋하세요. 소스를 갱신해 플러그인을 다시 게시했다면 스크립트도 다시 복사해 버전을 맞춥니다.
+두 파일을 프로젝트에 커밋하세요. 소스를 갱신해 플러그인을 다시 게시했다면 이 태스크를 다시 실행해 버전을 맞춥니다.
 AI 도구에 연결하는 방법은 README의 [AI 도구 연결](../README.ko.md#3-ai-도구-연결)을 참고하세요.
 
 ## 3. IntelliJ 플러그인 빌드와 설치
@@ -63,7 +60,7 @@ IntelliJ가 macOS의 다른 경로에 설치되어 있다면 `-PideaHome=/path/t
 ZIP은 IntelliJ IDEA 빌드 `262.10968`부터 `262.*`까지 설치할 수 있습니다.
 
 IntelliJ의 **Settings → Plugins → 톱니바퀴 → Install Plugin from Disk…**에서
-`build/distributions/spotless-bridge-0.1.0.zip`을 선택합니다. 이전 개발판 플러그인을 쓰고 있었다면
+`build/distributions/spotless-bridge-0.1.1.zip`을 선택합니다. 이전 개발판 플러그인을 쓰고 있었다면
 먼저 비활성화하거나 제거하세요. 이후 설정은 README의 [IntelliJ IDEA 설정](../README.ko.md#intellij-idea-미리보기)을 따릅니다.
 
 ## 개발

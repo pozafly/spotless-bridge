@@ -35,19 +35,17 @@ In `settings.gradle.kts`, use double quotes instead of single quotes.
 Then apply the plugin as described in the README's [Quick start](../README.md#quick-start).
 Once the plugin is on the Plugin Portal, remove the local `maven` entry.
 
-## 2. Copy the AI hook script
+## 2. Install the AI hook script
 
-From your project's Gradle root, copy the script and its license from the same checkout:
+After applying the locally published plugin, let it write the hook script and its license
+from your project's Gradle root:
 
 ```sh
-bridge_source=/path/to/spotless-bridge
-mkdir -p tools/spotless-bridge
-cp "$bridge_source/scripts/ai-hook.py" tools/spotless-bridge/ai-hook.py
-cp "$bridge_source/LICENSE" tools/spotless-bridge/LICENSE
+./gradlew spotlessBridgeInstallHook
 ```
 
-Commit both files. When you update the checkout and republish the plugin, copy the script again so
-that both stay on the same version. To connect the script to your AI tool, follow
+Commit both files. When you update the checkout and republish the plugin, run the task again so
+that the script matches the plugin. To connect the script to your AI tool, follow
 [Connect your AI tool](../README.md#3-connect-your-ai-tool) in the README.
 
 ## 3. Build and install the IntelliJ plugin
@@ -63,7 +61,7 @@ If IntelliJ is installed elsewhere on macOS, add `-PideaHome=/path/to/IntelliJ/C
 The ZIP supports IntelliJ IDEA builds `262.10968` through `262.*`.
 
 In IntelliJ, open **Settings → Plugins → gear menu → Install Plugin from Disk…** and select
-`build/distributions/spotless-bridge-0.1.0.zip`. If you installed an earlier development build,
+`build/distributions/spotless-bridge-0.1.1.zip`. If you installed an earlier development build,
 disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea-preview) in the README.
 
 ## Development
