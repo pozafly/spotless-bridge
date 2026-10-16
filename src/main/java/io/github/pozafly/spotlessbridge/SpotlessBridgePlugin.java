@@ -39,6 +39,15 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
                     + "Verified Gradle versions: 8.14.3, 8.14.6, 9.0.0, 9.8.1.", gradleVersion);
         // AI hooks run the launcher in .gradle, so any Gradle run (a build or an IDE sync) makes it available.
         writeLaunchers(project.getProjectDir().toPath());
+        List<Path> initialWatchRoots = new ArrayList<>();
+        project.getRootProject().getAllprojects().forEach(p -> initialWatchRoots.add(p.getProjectDir().toPath()));
+        project.getGradle().getIncludedBuilds().forEach(b -> initialWatchRoots.add(b.getProjectDir().toPath()));
+        String beforeEvaluation;
+        try {
+            beforeEvaluation = GradleFormatter.fingerprint(project.getProjectDir().toPath().toRealPath(), initialWatchRoots, List.of());
+        } catch (IOException e) {
+            throw new GradleException("Cannot read Spotless configuration inputs", e);
+        }
         project.getTasks().register("spotlessBridgeStart", task -> {
             task.setGroup(GROUP);
             task.setDescription("Export current Spotless settings and start or refresh the project daemon");
@@ -46,6 +55,9 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
             task.getExtensions().getExtraProperties().set("installSnapshot", (java.util.function.Consumer<Path>)
                     snapshot -> {
                         try {
+                            if (!beforeEvaluation.equals(GradleFormatter.fingerprint(
+                                    project.getProjectDir().toPath().toRealPath(), initialWatchRoots, List.of())))
+                                throw new IOException("Build files changed while the Spotless configuration was loading; retry");
                             SharedDaemon.install(project.getProjectDir().toPath(), snapshot);
                             project.getLogger()
                                     .lifecycle(
@@ -163,7 +175,47 @@ public final class SpotlessBridgePlugin implements Plugin<Project> {
                 Files.move(temporary, launcher, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 changed = true;
             }
-            state.resolve(LAUNCHERS.get(0)).toFile().setExecutable(true);
+            Path shellLauncher = state.resolve(LAUNCHERS.get(0));
+            if (!Files.isExecutable(shellLauncher)) shellLauncher.toFile().setExecutable(true);
+            String os = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT);
+            os = os.startsWith("windows") ? "windows" : os.startsWith("mac") ? "macos" : os.equals("linux") ? "linux" : "unsupported";
+            String arch = System.getProperty("os.arch");
+            arch = arch.equals("amd64") || arch.equals("x86_64") ? "x64"
+                    : arch.equals("aarch64") || arch.equals("arm64") ? "arm64" : "unsupported";
+            String executable = os.equals("windows") ? "spotless-bridge.exe" : "spotless-bridge";
+            Path pointer = state.resolve("native-client.txt");
+            try (InputStream input = SpotlessBridgePlugin.class.getResourceAsStream(
+                    "/spotless-bridge/native/" + os + "-" + arch + "/" + executable)) {
+                if (input == null) {
+                    // Unsupported platforms keep the portable Java launcher.
+                    Files.deleteIfExists(pointer);
+                } else {
+                    byte[] binary = input.readAllBytes();
+                    String hash;
+                    try {
+                        hash = java.util.HexFormat.of().formatHex(
+                                java.security.MessageDigest.getInstance("SHA-256").digest(binary));
+                    } catch (java.security.NoSuchAlgorithmException impossible) {
+                        throw new AssertionError(impossible);
+                    }
+                    Path target = state.resolve("native/" + hash + "/" + executable);
+                    if (!Files.isRegularFile(target) || !Arrays.equals(Files.readAllBytes(target), binary)) {
+                        Files.createDirectories(target.getParent());
+                        Path temp = Files.createTempFile(target.getParent(), "cli-", ".tmp");
+                        Files.write(temp, binary);
+                        temp.toFile().setExecutable(true);
+                        Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    }
+                    if (!Files.isExecutable(target)) target.toFile().setExecutable(true);
+                    String value = state.relativize(target) + "\n";
+                    if (!Files.isRegularFile(pointer) || !Files.readString(pointer).equals(value)) {
+                        Path temp = Files.createTempFile(state, "native-client-", ".tmp");
+                        Files.writeString(temp, value, StandardCharsets.UTF_8);
+                        Files.move(temp, pointer, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                        changed = true;
+                    }
+                }
+            }
             if (changed) Files.deleteIfExists(state.resolve("client-runtime.txt"));
         } catch (IOException e) {
             throw new GradleException("Cannot write the Spotless Bridge hook launchers", e);

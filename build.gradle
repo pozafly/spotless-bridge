@@ -89,6 +89,63 @@ tasks.named('processIdeaResources') {
     inputs.property('ideaSdkBuild', ideaSdkBuild)
     filesMatching('META-INF/plugin.xml') { expand(version: ideaPluginVersion, ideaSdkBuild: ideaSdkBuild) }
 }
+// Rust is a build-time tool only. Published JARs carry the prebuilt clients.
+def nativeOs = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+nativeOs = nativeOs.startsWith('windows') ? 'windows' : nativeOs.startsWith('mac') ? 'macos' : 'linux'
+def nativeArch = System.getProperty('os.arch') in ['aarch64', 'arm64'] ? 'arm64' : 'x64'
+def nativeName = nativeOs == 'windows' ? 'spotless-bridge.exe' : 'spotless-bridge'
+def nativePlatform = "${nativeOs}-${nativeArch}"
+def suppliedNative = providers.gradleProperty('nativeCliDirectory')
+def nativeDirectory = suppliedNative.map { file(it) }.orElse(layout.buildDirectory.dir('native').map { it.asFile })
+def nativeTarget = providers.gradleProperty('nativeTarget')
+def rustBuild = layout.buildDirectory.dir('rust').get().asFile
+
+tasks.register('buildNativeCli', Exec) {
+    group = 'build'
+    description = 'Build the native hook client for this host (Rust 1.90.0 required only when building from source)'
+    workingDir 'native'
+    inputs.files(fileTree('native') { include 'src/**', 'Cargo.*', 'rust-toolchain.toml' })
+    inputs.property('target', nativeTarget.orElse('host'))
+    inputs.property('rustFlags', providers.environmentVariable('RUSTFLAGS').orElse(''))
+    outputs.file(layout.buildDirectory.file("native/${nativePlatform}/${nativeName}"))
+    commandLine(['cargo', 'build', '--locked', '--release', '--target-dir', rustBuild.absolutePath] +
+            (nativeTarget.isPresent() ? ['--target', nativeTarget.get()] : []))
+    doLast {
+        def binary = new File(rustBuild, "${nativeTarget.isPresent() ? nativeTarget.get() + '/' : ''}release/${nativeName}")
+        copy { from binary; into layout.buildDirectory.dir("native/${nativePlatform}") }
+    }
+}
+tasks.register('testNativeCli', Exec) {
+    group = 'verification'
+    workingDir 'native'
+    commandLine(['cargo', 'test', '--locked', '--target-dir', rustBuild.absolutePath] +
+            (nativeTarget.isPresent() ? ['--target', nativeTarget.get()] : []))
+}
+tasks.named('processResources') {
+    if (!suppliedNative.isPresent()) dependsOn 'buildNativeCli'
+    from(nativeDirectory) { into 'spotless-bridge/native' }
+}
+tasks.named('check') {
+    if (!suppliedNative.isPresent()) dependsOn 'testNativeCli'
+}
+tasks.register('verifyNativeDistribution') {
+    group = 'verification'
+    description = 'Reject publication unless all six native clients are bundled'
+    dependsOn 'processResources'
+    doLast {
+        ['macos-x64', 'macos-arm64', 'linux-x64', 'linux-arm64', 'windows-x64', 'windows-arm64'].each { platform ->
+            def name = platform.startsWith('windows') ? 'spotless-bridge.exe' : 'spotless-bridge'
+            def binary = new File(nativeDirectory.get(), "${platform}/${name}")
+            if (!binary.isFile() || binary.length() == 0)
+                throw new GradleException("Missing native client ${platform}; collect the native workflow artifacts before publishing")
+        }
+        def cargoVersion = (file('native/Cargo.toml').text =~ /(?m)^version = "([^"]+)"/)
+        if (!cargoVersion.find() || cargoVersion.group(1) != project.version.toString())
+            throw new GradleException('native/Cargo.toml and gradle.properties versions must match')
+    }
+}
+tasks.named('publishPlugins') { dependsOn 'verifyNativeDistribution' }
+
 tasks.register('engineDist', Sync) {
     dependsOn jar
     into layout.buildDirectory.dir('engine')
@@ -200,4 +257,14 @@ tasks.register('verifyIdeaPlugin', JavaExec) {
             logger.lifecycle("IntelliJ ${target.version} (${target.build}): ${matches.first().text.trim()}")
         }
     }
+}
+
+tasks.register('nativeSmokeTest', JavaExec) {
+    group = 'verification'
+    description = 'Run the packaged native client against a real Gradle consumer on the host OS'
+    dependsOn testClasses, publishAllPublicationsToTestRepository
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.pozafly.spotlessbridge.NativeCliSelfTest'
+    args layout.buildDirectory.dir('repository').get().asFile.absolutePath, project.version.toString()
+    workingDir rootDir
 }

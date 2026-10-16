@@ -133,7 +133,9 @@ public final class SharedDaemon {
             }
             if (existing != null
                     && (!engineId.equals(existing.getProperty("engine"))
-                            || !javaHome.equals(existing.getProperty("javaHome")))) {
+                            || !javaHome.equals(existing.getProperty("javaHome"))
+                            || !Objects.toString(System.getenv("GRADLE_USER_HOME"), "").equals(
+                                    existing.getProperty("gradleUserHomeEnv", "")))) {
                 request(existing, "stop", "", "", "");
                 waitStopped(existing);
                 existing = null;
@@ -142,26 +144,30 @@ public final class SharedDaemon {
                 String token = UUID.randomUUID().toString() + UUID.randomUUID();
                 Path launch = Files.createTempFile(state, "launch-", ".token");
                 Files.writeString(launch, token);
-                Process process = new ProcessBuilder(
+                ProcessBuilder launchBuilder = new ProcessBuilder(
                                 Path.of(javaHome, "bin", windows() ? "java.exe" : "java")
                                         .toString(),
                                 "-Xmx128m",
                                 "-cp",
-                                jar.toString(),
+                                root.relativize(jar).toString(),
                                 SharedDaemon.class.getName(),
-                                root.toString(),
-                                engine.toString(),
+                                ".",
+                                root.relativize(engine).toString(),
                                 engineId,
-                                launch.toString(),
-                                snapshot.toString(),
+                                root.relativize(launch).toString(),
+                                root.relativize(snapshot).toString(),
                                 key,
                                 System.getProperty("spotlessBridge.idleSeconds", "1800"))
                         .directory(root.toFile())
                         .redirectInput(ProcessBuilder.Redirect.from(new File(windows() ? "NUL" : "/dev/null")))
                         .redirectErrorStream(true)
                         .redirectOutput(ProcessBuilder.Redirect.appendTo(
-                                state.resolve("daemon.log").toFile()))
-                        .start();
+                                state.resolve("daemon.log").toFile()));
+                // Gradle updates the Java environment between builds. Explicitly copy it so a
+                // removed variable is not inherited from the long-lived Gradle process's OS environment.
+                launchBuilder.environment().clear();
+                launchBuilder.environment().putAll(System.getenv());
+                Process process = launchBuilder.start();
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
                 while (System.nanoTime() < deadline && process.isAlive()) {
                     try {
@@ -278,12 +284,14 @@ public final class SharedDaemon {
 
     private static void waitStopped(Properties endpoint) throws Exception {
         // Never kill a PID from a state file: it may have been recycled by the OS.
+        ProcessHandle process = ProcessHandle.of(Long.parseLong(endpoint.getProperty("pid"))).orElse(null);
         long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < end) {
             try {
                 request(endpoint, "ping", "", "", "");
             } catch (IOException stopped) {
-                return;
+                // Windows keeps the runtime JAR locked until the JVM actually exits.
+                if (process == null || !process.isAlive()) return;
             }
             Thread.sleep(50);
         }
@@ -352,11 +360,21 @@ public final class SharedDaemon {
      */
     public static ApplyResult apply(Path root, Path list) throws Exception {
         Properties endpoint = endpoint(root);
-        Properties metadata = metadata(endpoint);
+        return apply(root, metadata(endpoint), Files.readAllLines(list, StandardCharsets.UTF_8),
+                (file, source) -> format(endpoint, file, source));
+    }
+
+    @FunctionalInterface
+    private interface FileFormatter {
+        String format(Path file, String source) throws IOException;
+    }
+
+    private static ApplyResult apply(Path root, Properties metadata, List<String> files, FileFormatter formatter)
+            throws Exception {
         String fingerprint = metadata.getProperty("fingerprint");
         Map<Path, byte[][]> results = new LinkedHashMap<>();
         int skipped = 0;
-        for (String line : Files.readAllLines(list, StandardCharsets.UTF_8)) {
+        for (String line : files) {
             if (line.isBlank()) continue;
             Path file = root.resolve(line).toRealPath();
             String ids = metadata.getProperty("target." + file);
@@ -373,7 +391,7 @@ public final class SharedDaemon {
             byte[] original = Files.readAllBytes(file);
             String source =
                     encoding.newDecoder().decode(ByteBuffer.wrap(original)).toString();
-            String formatted = format(endpoint, file, source);
+            String formatted = formatter.format(file, source);
             ByteBuffer encoded = encoding.newEncoder().encode(java.nio.CharBuffer.wrap(formatted));
             byte[] result = new byte[encoded.remaining()];
             encoded.get(result);
@@ -404,7 +422,7 @@ public final class SharedDaemon {
      * @throws Exception if server setup, snapshot loading, or server operation fails
      */
     public static void main(String[] args) throws Exception {
-        Path root = Path.of(args[0]), engine = Path.of(args[1]);
+        Path root = Path.of(args[0]).toRealPath(), engine = Path.of(args[1]).toRealPath();
         Path state = state(root), endpointPath = state.resolve("endpoint.properties");
         String token = Files.readString(Path.of(args[3]));
         Files.delete(Path.of(args[3]));
@@ -412,9 +430,11 @@ public final class SharedDaemon {
         endpoint.setProperty("root", root.toString());
         endpoint.setProperty("engine", args[2]);
         endpoint.setProperty("token", token);
-        endpoint.setProperty("snapshot", args[4]);
+        endpoint.setProperty("snapshot", Path.of(args[4]).toRealPath().toString());
         endpoint.setProperty("key", args[5]);
         endpoint.setProperty("protocol", PROTOCOL);
+        endpoint.setProperty("nativeApply", "2");
+        endpoint.setProperty("gradleUserHomeEnv", Objects.toString(System.getenv("GRADLE_USER_HOME"), ""));
         endpoint.setProperty("pid", Long.toString(ProcessHandle.current().pid()));
         endpoint.setProperty(
                 "javaHome",
@@ -428,6 +448,7 @@ public final class SharedDaemon {
             try (ServerSocket server = new ServerSocket(0, 64, InetAddress.getLoopbackAddress())) {
                 server.setSoTimeout(1000);
                 endpoint.setProperty("port", Integer.toString(server.getLocalPort()));
+                endpoint.setProperty("nativeFamily", server.getInetAddress() instanceof Inet6Address ? "6" : "4");
                 write(endpointPath, endpoint);
                 long lastRequest = System.nanoTime();
                 while (System.nanoTime() - lastRequest < idleNanos) {
@@ -474,6 +495,44 @@ public final class SharedDaemon {
                                                 Path.of(endpoint.getProperty("snapshot")),
                                                 Duration.ofSeconds(15));
                                     result = worker.format(Path.of(path), text);
+                                }
+                                case "apply", "apply-refreshed" -> {
+                                    // Root and file names use the UTF-8 payload, not Java modified UTF-8 headers.
+                                    List<String> lines = text.lines().toList();
+                                    if (lines.size() < 2 || !root.equals(Path.of(lines.get(0)).toRealPath()))
+                                        throw new IOException("Wrong project root");
+                                    List<String> files = lines.subList(2, lines.size());
+                                    List<Path> canonical = new ArrayList<>();
+                                    for (String file : files) {
+                                        Path resolved = root.resolve(file).toRealPath();
+                                        if (!Files.isRegularFile(resolved)) throw new IOException("Not a file: " + file);
+                                        canonical.add(resolved);
+                                    }
+                                    if (!Files.isRegularFile(Path.of(endpoint.getProperty("snapshot"), "snapshot.properties"))) {
+                                        status = 3;
+                                        result = "Spotless snapshot is missing";
+                                        break;
+                                    }
+                                    Properties metadata = metadata(endpoint);
+                                    boolean stale = !lines.get(1).equals(endpoint.getProperty("gradleUserHomeEnv"))
+                                            || !key.equals(endpoint.getProperty("key"))
+                                            || !metadata.getProperty("fingerprint").equals(
+                                                    GradleFormatter.fingerprint(root, watchedRoots(metadata), List.of()));
+                                    boolean unknown = canonical.stream().anyMatch(file ->
+                                            !metadata.containsKey("target." + file));
+                                    if (stale || (unknown && action.equals("apply"))) {
+                                        // No writes have happened. The client refreshes OUTSIDE this serial loop.
+                                        status = 3;
+                                        result = "Spotless configuration requires refresh";
+                                    } else {
+                                        if (worker == null)
+                                            worker = new WorkerClient(
+                                                    Path.of(System.getProperty("java.home"), "bin", windows() ? "java.exe" : "java"),
+                                                    engine, state.resolve("worker.log"),
+                                                    Path.of(endpoint.getProperty("snapshot")), Duration.ofSeconds(15));
+                                        ApplyResult applied = apply(root, metadata, files, worker::format);
+                                        result = applied.formatted() + " " + applied.changed() + " " + applied.skipped();
+                                    }
                                 }
                                 case "workerPid" -> result = Long.toString(worker == null ? -1 : worker.pid());
                                 default -> throw new IOException("Unknown daemon operation");

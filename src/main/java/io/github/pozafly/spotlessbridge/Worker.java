@@ -29,7 +29,8 @@ public final class Worker {
                 .parent()
                 .ifPresent(parent ->
                         parent.onExit().thenRun(() -> Runtime.getRuntime().halt(0)));
-        Path snapshot = Path.of(args[0]);
+        // ASCII URI arguments survive Windows launchers whose ANSI code page cannot represent the path.
+        Path snapshot = args[0].startsWith("file:") ? Path.of(java.net.URI.create(args[0])) : Path.of(args[0]);
         Properties metadata = new Properties();
         try (InputStream in = Files.newInputStream(snapshot.resolve("snapshot.properties"))) {
             metadata.load(in);

@@ -15,9 +15,12 @@ public final class SharedDaemonSelfTest {
         Path installedHook = state.resolve("spotless-bridge");
         gradle(root, "help");
         String launcher = Files.readString(installedHook);
-        check(Files.isExecutable(installedHook) && launcher.startsWith("#!/bin/sh"), "Gradle run writes the POSIX launcher");
+        check((windows() || Files.isExecutable(installedHook)) && launcher.startsWith("#!/bin/sh"), "Gradle run writes the POSIX launcher");
         check(Files.readString(state.resolve("spotless-bridge.cmd")).contains("\r\n"), "Windows launcher uses CRLF");
         check(!Files.exists(root.resolve("tools")), "launchers stay out of the project sources");
+        check(Files.isRegularFile(state.resolve("native-client.txt")), "Gradle installs native CLI for this platform");
+        Path nativeClient = state.resolve(Files.readString(state.resolve("native-client.txt")).strip());
+        check(Files.isRegularFile(nativeClient), "packaged native executable exists");
         // A new CLI initially knows only the root; a cached snapshot also watches this external included build.
         Path included = root.getParent().resolve("included-build");
         Files.createDirectories(included);
@@ -91,7 +94,7 @@ public final class SharedDaemonSelfTest {
         // Real process death leaves a stale endpoint; an editor must bootstrap through Gradle again.
         long orphan = SharedDaemon.workerPid(root);
         ProcessHandle killed = ProcessHandle.of(pid).orElseThrow();
-        killed.destroyForcibly();
+        check(killed.destroyForcibly(), "OS rejected the fixture daemon termination");
         killed.onExit().get(5, TimeUnit.SECONDS);
         ProcessHandle.of(orphan)
                 .ifPresent(
@@ -119,6 +122,59 @@ public final class SharedDaemonSelfTest {
         Files.delete(added);
         System.out.println("PASS: zero-Gradle warm hooks, one-Gradle cold/config refresh");
 
+        // One client prepares the complete batch, even when new, excluded and non-Java files are mixed.
+        Path batchFirst = file.resolveSibling("Batch One.java");
+        Path batchSecond = file.resolveSibling("Batch, Two.java");
+        Path excludedBatch = file.resolveSibling("Excluded.java");
+        Path note = root.resolve("batch-note.txt");
+        Files.writeString(batchFirst, source);
+        Files.writeString(batchSecond, source);
+        Files.writeString(file, source);
+        Files.writeString(note, "leave this unchanged\n");
+        calls = Files.readAllLines(counter).size();
+        hook(root, excludedBatch, batchFirst, note, batchSecond, file, batchFirst);
+        check(Files.readAllLines(counter).size() == calls + 1, "mixed batch refreshes Gradle only once");
+        for (Path target : List.of(batchFirst, batchSecond, file))
+            check(Files.readString(target).equals(expected), "batch output: " + target);
+        check(Files.readString(excludedBatch).equals(source), "batch preserves excluded source");
+        check(Files.readString(note).equals("leave this unchanged\n"), "batch preserves non-target text");
+        worker = SharedDaemon.workerPid(root);
+        pid = SharedDaemon.status(root);
+        for (Path target : List.of(batchFirst, batchSecond, file)) Files.writeString(target, source);
+        hook(root, batchFirst, batchSecond, file);
+        check(Files.readAllLines(counter).size() == calls + 1, "warm known batch skips Gradle");
+        check(SharedDaemon.workerPid(root) == worker && SharedDaemon.status(root) == pid,
+                "warm batch reuses daemon and worker");
+        for (Path target : List.of(batchFirst, batchSecond, file))
+            check(Files.readString(target).equals(expected), "warm batch output: " + target);
+
+        // External included-build configuration remains watched by a newly started hook client.
+        Files.writeString(included.resolve("build.gradle"), "// changed external configuration\n");
+        hook(root, batchFirst, batchSecond, file);
+        check(Files.readAllLines(counter).size() == calls + 2, "batch detects included-build changes once");
+        hook(root, batchFirst, batchSecond, file);
+        check(Files.readAllLines(counter).size() == calls + 2, "batch reuses refreshed included-build snapshot");
+
+        // A bad path must abort the entire batch before writing even a valid file listed first.
+        Files.writeString(batchFirst, source);
+        hookOutput(root, 1, batchFirst, root.resolve("Missing.java"), batchSecond);
+        check(Files.readString(batchFirst).equals(source), "missing batch path prevents partial writes");
+        Files.writeString(list, batchFirst + "\n" + batchSecond + "\n");
+        Files.writeString(included.resolve("build.gradle"), "// changed after preparation\n");
+        try {
+            SharedDaemon.apply(root, list);
+            throw new AssertionError("stale prepared configuration accepted");
+        } catch (IOException expectedFailure) {
+            check(expectedFailure.getMessage().contains("Build settings changed"), "batch post-format validation");
+        }
+        check(Files.readString(batchFirst).equals(source), "changed configuration prevents batch writes");
+        hook(root, batchFirst, batchSecond);
+        Files.delete(batchFirst);
+        Files.delete(batchSecond);
+        Files.delete(note);
+        Files.writeString(list, file + "\n");
+        System.out.println("PASS: mixed batch, warm reuse, included-build refresh and pre-write validation");
+
         // Any Gradle run restores a changed launcher and drops the recorded client so the next hook uses this engine.
         Files.writeString(installedHook, launcher + "# locally modified\n");
         gradle(root, "help");
@@ -131,7 +187,7 @@ public final class SharedDaemonSelfTest {
         Files.writeString(file, source);
         java(root, root.toString(), list.toString());
         check(Files.readString(file).equals(expected), "pre-0.1.1 list-file client protocol");
-        String missing = hookOutput(root, root.resolve("src/main/java/Missing.java"), 1);
+        String missing = hookOutput(root, 1, root.resolve("src/main/java/Missing.java"));
         check(missing.startsWith("Spotless Bridge: file not found:") && !missing.contains("\tat "),
                 "hook reports a missing file in one line: " + missing);
         // Partial .gradle cleanup can remove the engine while client-runtime.txt survives; the launcher rebuilds it.
@@ -166,6 +222,9 @@ public final class SharedDaemonSelfTest {
             byte[] actual = Files.readAllBytes(file);
             String text = new String(actual, java.nio.charset.StandardCharsets.UTF_16LE);
             check(text.contains("\r\n") && !text.replace("\r\n", "").contains("\n"), "disk CRLF preserved");
+            Files.write(file, source.getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
+            hook(root, file);
+            check(Arrays.equals(actual, Files.readAllBytes(file)), "native hook preserves encoding and CRLF");
             // Ordinary Spotless must produce byte-identical output for the same selected file.
             Files.write(file, source.getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
             gradle(root, "spotlessApply", "-PspotlessIdeHook=" + file.toRealPath());
@@ -222,17 +281,24 @@ public final class SharedDaemonSelfTest {
         System.out.println("PASS: authentication, encoding/CRLF parity, concurrent startup, explicit stop, idle exit");
     }
 
-    private static String hook(Path root, Path file) throws Exception {
-        return hookOutput(root, file, 0);
+    private static boolean windows() {
+        return System.getProperty("os.name").startsWith("Windows");
     }
 
-    private static String hookOutput(Path root, Path file, int expectedExit) throws Exception {
+    private static String hook(Path root, Path... files) throws Exception {
+        return hookOutput(root, 0, files);
+    }
+
+    private static String hookOutput(Path root, int expectedExit, Path... files) throws Exception {
         // Use the shipped hook adapter as an external process, with no editor client alive.
         Path log = Files.createTempFile("shared-daemon-hook-", ".log");
         // Run from another working directory: the launcher finds its Gradle root from its own location.
-        Process process = new ProcessBuilder(
-                        root.resolve(".gradle/spotless-bridge/spotless-bridge").toAbsolutePath().toString(),
-                        file.toString())
+        List<String> command = new ArrayList<>();
+        if (windows()) command.addAll(List.of("cmd.exe", "/d", "/c",
+                root.resolve(".gradle/spotless-bridge/spotless-bridge.cmd").toAbsolutePath().toString()));
+        else command.add(root.resolve(".gradle/spotless-bridge/spotless-bridge").toAbsolutePath().toString());
+        for (Path file : files) command.add(file.toString());
+        Process process = new ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .redirectOutput(log.toFile())
                 .start();
@@ -247,7 +313,7 @@ public final class SharedDaemonSelfTest {
     private static void java(Path root, String... args) throws Exception {
         List<String> runtime = Files.readAllLines(root.resolve(".gradle/spotless-bridge/client-runtime.txt"));
         List<String> command = new ArrayList<>(List.of(
-                Path.of(runtime.get(1), "bin", "java").toString(), "-cp", runtime.get(0), GradleFormatter.class.getName()));
+                Path.of(runtime.get(1), "bin", windows() ? "java.exe" : "java").toString(), "-cp", runtime.get(0), GradleFormatter.class.getName()));
         command.addAll(List.of(args));
         Process process = new ProcessBuilder(command).directory(root.toFile()).inheritIO().start();
         check(process.waitFor(120, TimeUnit.SECONDS) && process.exitValue() == 0, "client failed: " + command);
@@ -273,7 +339,7 @@ public final class SharedDaemonSelfTest {
 
     private static String gradle(Path root, String... args) throws Exception {
         List<String> command = new ArrayList<>(List.of(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                Path.of(System.getProperty("java.home"), "bin", windows() ? "java.exe" : "java").toString(),
                 "-cp",
                 root.resolve("gradle/wrapper/gradle-wrapper.jar").toString(),
                 "org.gradle.wrapper.GradleWrapperMain",
