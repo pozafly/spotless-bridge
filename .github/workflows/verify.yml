@@ -20,7 +20,7 @@ jobs:
           - gradle: "9.8.1"
             java: "25"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up consumer JDK
         id: consumer-java
         uses: actions/setup-java@v4

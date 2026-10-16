@@ -8,6 +8,30 @@ hook이 daemon을 시작하고 재사용합니다. 전역 설치나 OS 시작 �
 
 첫 공개 배포 버전은 **0.1.0으로 준비 중**이며 Gradle Plugin Portal·JetBrains Marketplace에는 아직 게시하지 않았습니다.
 
+## 검증한 호환 조합
+
+Bridge 0.1.0의 최소 실행 버전은 **JDK 21**이며, 다음 소비 프로젝트 실행 조합으로 검증합니다.
+
+| 소비 프로젝트 JDK | 소비 프로젝트 Gradle | Spotless 검증 범위 |
+| --- | --- | --- |
+| 21 | 8.14.3 | 8.10.2 전체 회귀 검사, 8.0.0 버전 전환·포맷 결과 일치 검사 |
+| 21 | 8.14.6 | 동일한 검사 |
+| 21 | 9.0.0 | 동일한 검사 |
+| 21 | 9.8.1 | 동일한 검사 |
+| 25 | 9.8.1 | 동일한 검사 |
+
+실제로 검사한 조합이며 모든 JDK, Gradle 8.x/9.x 또는 Spotless 버전을 보장하지는 않습니다.
+Groovy/Kotlin DSL, 일반 Spotless와의 결과 일치, 신규·제외 파일, 설정 갱신,
+공용 daemon 재사용, 동시 요청, IDE 없는 hook 실행을 검사합니다.
+Configuration cache와 isolated projects는 계속 지원하지 않습니다.
+
+Bridge는 **JDK 21**과 저장소의 Gradle 8.14.3 wrapper로 빌드합니다. 테스트는 Java 21 대상으로 만든
+같은 엔진을 선택한 소비 프로젝트 JDK로 실행하며, Gradle·daemon·worker·hook까지 포함합니다.
+Ubuntu CI는 기존 JDK 21 조합 네 개를 유지하고 JDK 25·Gradle 9.8.1 조합을 추가했습니다.
+JDK 25 조합은 로컬 macOS의 Temurin 25.0.4.1에서도 검증했습니다.
+JDK 25와 Gradle 8.x·9.0.0의 조합은 검증 대상이 아닙니다.
+IntelliJ 지원 빌드 범위는 별도 설치 안내를 참고하세요.
+
 ## 프로젝트 설정
 
 루트 `build.gradle`에 daemon 플러그인을 적용하고, 기존 Spotless 규칙을 유지합니다.
@@ -197,6 +221,22 @@ hook의 감지 범위 밖에 있는 입력을 바꾸었다면 `spotlessBridgeSta
 - 기본 정책 밖에 생성되는 소스는 해당 생성 태스크를 먼저 실행해야 합니다.
 
 ## 검증과 배포
+
+같은 검사를 다른 소비 프로젝트 Gradle 버전으로 실행하려면 다음과 같이 지정합니다. 기본값은 `8.14.3`입니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
+```
+
+컴파일은 JDK 21로 유지하고 전체 호환성 검사를 JDK 25로 실행하려면 다음과 같이 지정합니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
+  -PtestGradleVersion=9.8.1 -PtestJavaHome=/path/to/jdk25
+```
+
+`testJavaHome`의 기본값은 빌드 JVM의 홈 경로입니다. hook 최초 실행의 `JAVA_HOME`에도 적용하며,
+시스템 기본 Java나 엔진의 최소 실행 버전을 바꾸지 않습니다.
 
 `./gradlew check`는 IDE 없이 로컬 Maven 저장소에 플러그인을 게시한 후 실제 소비 프로젝트에서 실행합니다.
 Spotless 8.10.2/8.0.0, Palantir·Google·Eclipse, Groovy/Kotlin DSL, 다중 모듈,

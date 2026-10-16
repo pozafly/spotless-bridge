@@ -37,6 +37,33 @@ Spotless 내부 API 변경이나 직렬화 불가 단계는 실패할 수 있습
 JAVA_HOME=/path/to/jdk21 ./gradlew clean build pluginZip
 ```
 
+JDK 21을 유지하고 소비 프로젝트 Gradle 버전만 바꾸는 호환성 검사는 다음과 같습니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
+```
+
+`testGradleVersion`의 기본값은 `8.14.3`입니다. CI는 `8.14.3`, `8.14.6`, `9.0.0`, `9.8.1`을 각각 검사합니다.
+Bridge 자체 빌드는 저장소의 8.14.3 wrapper를 유지하고, Groovy/Kotlin 임시 소비 프로젝트에만 지정한
+배포본 URL을 설정합니다. 각 소비 프로젝트는 `--version` 결과를 확인한 뒤 회귀 검사를 실행합니다.
+Spotless 8.10.2로 전체 검사를 실행하고, 같은 Gradle에서 8.0.0 전환·복원 시 결과 일치와 worker 교체도 검사합니다.
+8.0.0 전체 기능 조합이나 모든 Gradle 8.x/9.x를 검증한 것은 아닙니다.
+
+JDK 25는 Gradle 9.8.1과 함께 검사합니다. 빌드 JDK와 Java 21 바이트코드는 유지합니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
+  -PtestGradleVersion=9.8.1 -PtestJavaHome=/path/to/jdk25
+```
+
+`testJavaHome`을 지정하면 `selfTest` JavaExec 실행 파일과 자식 프로세스의 `JAVA_HOME`을 함께 선택합니다.
+기본값은 빌드 JVM의 홈 경로입니다. 테스트 프로세스, 소비 Gradle, daemon, worker와 hook이 같은 JDK를 사용하며,
+테스트는 환경 변수·실행 JVM 일치, daemon endpoint의 JDK, hook runtime의 JDK를 검사합니다.
+CI는 소비 JDK를 준비한 뒤 빌드 JDK를 21로 설정하고, 소비 JDK 경로를 `testJavaHome`으로 명시합니다.
+JDK 25 조합은 Temurin 25.0.4.1(macOS)로 검증했으며 기존 JDK 21 엔진 JAR의 SHA-256과
+class major version 65가 유지됨을 확인했습니다. 임의의 상위 JDK나 Java 25의 모든 문법 지원을 의미하지 않습니다.
+
+
 `check`는 `build/repository`에 marker와 구현 JAR를 게시하고, 임시 소비 프로젝트에서 실제로 해석합니다.
 따라서 source classpath만 연결한 테스트와 달리 플러그인 패키징·배포 메타데이터도 경로에 포함됩니다.
 전역 Maven 로컬 저장소는 변경하지 않습니다.

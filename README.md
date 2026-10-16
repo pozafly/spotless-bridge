@@ -12,15 +12,38 @@ installation below with a source checkout containing these changes.
 
 ## Requirements and support
 
-- JDK 21 and the consuming project's Gradle wrapper.
+- JDK 21 or a verified newer runtime from the compatibility table, and the consuming project's Gradle wrapper.
 - Python 3 for the recommended AI hook; it uses only the standard library.
-- Automated tests use Gradle 8.14.3, Spotless 8.10.2/8.0.0, and Palantir, Google, and Eclipse formatters.
-  These are tested combinations, not a guarantee for all Spotless versions or custom steps.
-- Local verification has used macOS. The CI workflow targets Linux; Windows and Gradle 9 are not verified.
+- Automated tests cover Palantir, Google, and Eclipse formatters; see the compatibility table for Gradle and Spotless versions.
+- Local verification has used macOS. The CI workflow targets Linux; Windows is not verified.
 - Java whole-file formatting only. Maven, other languages, and range formatting are not supported.
 - Gradle configuration cache and isolated projects are explicitly declared unsupported.
 
 Spotless Bridge does not select your Spotless or formatter versions. Keep them in your own build.
+
+## Verified compatibility
+
+Bridge 0.1.0 requires **JDK 21 or newer**. These consumer runtime combinations are tested:
+
+| Consumer JDK | Consumer Gradle | Spotless verification |
+| --- | --- | --- |
+| 21 | 8.14.3 | 8.10.2 full regression suite; 8.0.0 version-switch and output-parity check |
+| 21 | 8.14.6 | Same checks |
+| 21 | 9.0.0 | Same checks |
+| 21 | 9.8.1 | Same checks |
+| 25 | 9.8.1 | Same checks |
+
+These are tested combinations, not a guarantee for every JDK, Gradle 8.x/9.x, or Spotless version.
+The suite covers Groovy/Kotlin DSL, native Spotless output parity, new and excluded files,
+configuration refresh, shared daemon reuse, concurrent requests, and hooks running without an IDE.
+Configuration cache and isolated projects remain unsupported.
+
+Bridge is built with **JDK 21** and the checked-in Gradle 8.14.3 wrapper. The tests run the same
+Java 21-targeted engine on the selected consumer JDK, including Gradle, the daemon, workers, and hooks.
+The Ubuntu CI matrix keeps the four JDK 21 combinations and adds JDK 25 with Gradle 9.8.1.
+The JDK 25 combination was also verified locally on macOS with Temurin 25.0.4.1.
+JDK 25 is not a tested combination with Gradle 8.x or 9.0.0.
+See the IntelliJ section for its separate supported build range.
 
 ## Project setup
 
@@ -214,6 +237,22 @@ share the most recently refreshed configuration; align properties and environmen
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist
 ```
+
+To run the same suite against a different consumer Gradle version (the default is `8.14.3`):
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
+```
+
+To keep compilation on JDK 21 and run the entire compatibility suite on JDK 25:
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
+  -PtestGradleVersion=9.8.1 -PtestJavaHome=/path/to/jdk25
+```
+
+`testJavaHome` defaults to the build JVM's home. It also sets `JAVA_HOME` for hook bootstrap;
+it does not change your system default Java or the engine's minimum runtime version.
 
 `check` publishes to a local file repository and tests the actual plugin in isolated consumer builds.
 It covers Groovy/Kotlin DSL, multiple modules, formatter parity, new/excluded files, configuration
