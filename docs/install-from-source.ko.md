@@ -94,6 +94,10 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
 `testJavaHome`을 지정하지 않으면 빌드 JVM의 홈 경로를 사용합니다. 이 값은 hook 최초 실행 시의 `JAVA_HOME`에도 적용되며,
 시스템 기본 Java나 엔진의 최소 실행 버전은 바꾸지 않습니다.
 
+다른 소비 프로젝트 Spotless 버전으로 검사하려면 `-PtestSpotlessVersion=<버전>`을 추가합니다. 기본값은 `8.10.2`입니다.
+CI는 두 조합을 macOS에서도 실행하고, 매주 최신 Spotless로 전체 검사를 돌려 Bridge가 의존하는
+Spotless 내부 API의 변경을 미리 확인합니다.
+
 Bridge 자체는 JDK 21과 저장소에 포함된 Gradle 8.14.3 wrapper로 빌드합니다. 테스트에서는 Java 17 대상으로 빌드한
 같은 엔진을 선택한 소비 프로젝트 JDK로 실행하며, Gradle·daemon·worker·hook 모두 이 JDK를 사용합니다.
 Ubuntu CI는 JDK 17·21에서 각각 네 Gradle 버전을, JDK 25에서 Gradle 9.8.1을 검사하도록 구성했습니다.

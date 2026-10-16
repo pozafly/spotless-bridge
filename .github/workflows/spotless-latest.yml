@@ -1,0 +1,30 @@
+name: Latest Spotless compatibility
+# Bridge relies on Spotless internal APIs. Run the full suite against the newest Spotless Gradle plugin
+# every week so upstream changes are caught before users hit them.
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  latest-spotless:
+    name: Latest Spotless / Gradle 9.8.1 / JDK 21
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Find the latest Spotless Gradle plugin
+        id: spotless
+        run: |
+          version=$(curl -fsSL https://plugins.gradle.org/m2/com/diffplug/spotless/spotless-plugin-gradle/maven-metadata.xml \
+            | sed -n 's:.*<release>\(.*\)</release>.*:\1:p')
+          test -n "$version"
+          echo "Latest Spotless: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Verify Bridge with the latest Spotless
+        run: ./gradlew --no-daemon --console=plain check engineDist -PtestGradleVersion=9.8.1 -PtestSpotlessVersion=${{ steps.spotless.outputs.version }}

@@ -7,8 +7,8 @@ gradlePlugin {
             id = 'io.github.pozafly.spotlessbridge'
             implementationClass = 'io.github.pozafly.spotlessbridge.SpotlessBridgePlugin'
             displayName = 'Spotless Bridge'
-            tags.addAll('spotless', 'formatter', 'java', 'daemon')
-            description = 'Project-owned Spotless Java daemon shared by editors and automation'
+            tags.addAll('spotless', 'formatter', 'formatting', 'java', 'intellij', 'ai', 'daemon')
+            description = "Format Java files with your project's own Spotless rules from AI coding hooks and IntelliJ, without waiting for Gradle on every run"
             compatibility(it) {
                 features {
                     configurationCache = false
@@ -87,6 +87,8 @@ tasks.register('selfTest', JavaExec) {
     def testJavaHome = providers.gradleProperty('testJavaHome').orElse(System.getProperty('java.home')).get()
     executable = new File(testJavaHome, "bin/${System.getProperty('os.name').startsWith('Windows') ? 'java.exe' : 'java'}").absolutePath
     environment 'JAVA_HOME', testJavaHome
+    // CI overrides the consumer Spotless version to catch upstream internal API changes early.
+    systemProperty 'spotlessBridge.testSpotlessVersion', providers.gradleProperty('testSpotlessVersion').orElse('8.10.2').get()
     args layout.buildDirectory.dir('engine').get().asFile.absolutePath,
             layout.buildDirectory.dir('repository').get().asFile.absolutePath,
             project.version.toString(),

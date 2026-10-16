@@ -119,6 +119,7 @@ The daemon shuts down after 30 minutes without requests and starts again on the 
   and **1.30.0 on JDK 21/25**; 1.30.0 requires JDK 21+. Bridge preserves the project's chosen version and reports
   incompatibility instead of silently downgrading it. Palantir 2.97.0/2.96.0 and the fixture's Eclipse configuration are also tested.
 - Bridge formats **whole Java files in Gradle projects**. Maven support is in progress; other languages are not supported.
+- CI verifies Bridge on Linux and macOS. The Windows launcher is included but not yet verified.
 - Not supported: Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, and non-serializable formatting steps.
   Run Bridge tasks with `--no-configuration-cache` if your build enables the configuration cache.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.

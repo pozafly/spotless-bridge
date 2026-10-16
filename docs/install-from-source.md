@@ -95,6 +95,10 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
 `testJavaHome` defaults to the build JVM's home. It also sets `JAVA_HOME` for the hook's first run,
 but it doesn't change your system default Java or the engine's minimum runtime version.
 
+To run the suite against another consumer Spotless version (the default is `8.10.2`), add
+`-PtestSpotlessVersion=<version>`. CI also runs two combinations on macOS, and a weekly workflow runs the suite
+against the latest Spotless release to catch changes in the Spotless internal APIs Bridge relies on.
+
 Bridge itself is built with JDK 21 and the checked-in Gradle 8.14.3 wrapper. Tests run the same
 Java 17-targeted engine on the selected consumer JDK, which covers Gradle, the daemon, workers, and hooks.
 Ubuntu CI is configured for four Gradle versions each on JDK 17 and 21, plus JDK 25 with Gradle 9.8.1: nine combinations
