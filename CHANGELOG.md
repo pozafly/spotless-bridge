@@ -9,28 +9,26 @@ First release published to the Gradle Plugin Portal.
 
 ### Added
 
-- `spotlessBridgeInstallHook` writes the AI hook launchers (`spotless-bridge` for macOS and Linux,
-  `spotless-bridge.cmd` for Windows) and their license into `tools/spotless-bridge/`.
+- The plugin writes an AI hook launcher to `.gradle/spotless-bridge/` (`spotless-bridge` for macOS and Linux,
+  `spotless-bridge.cmd` for Windows) on every Gradle run. Nothing has to be installed or committed.
 - The launcher prepares the engine again when it is missing, for example after part of `.gradle` was removed.
 - Hook errors are reported in one line, such as `Spotless Bridge: file not found: <path>`, with exit code 1.
-- `spotlessBridgeStart` warns when an installed launcher differs from the one in the plugin, or when the
-  0.1.0 `ai-hook.py` is still present.
 - Gradle and Spotless version checks: Gradle 8.14.3 or newer and below 10.0, and Spotless 8.x, are accepted.
   Versions outside the verified list warn; versions outside the range stop with the detected version and the accepted range.
 - Descriptions for `spotlessBridgeStatus` and `spotlessBridgeStop`.
 
 ### Changed
 
-- **The AI hook no longer needs Python.** The Python `ai-hook.py` is replaced by the launchers above,
-  and the hook logic moved into the engine. Hook commands change from `python3 tools/spotless-bridge/ai-hook.py`
-  to `tools/spotless-bridge/spotless-bridge`.
+- **The AI hook no longer needs Python or a copied script.** The hook command changes from
+  `python3 tools/spotless-bridge/ai-hook.py <root> <files>` to `.gradle/spotless-bridge/spotless-bridge <files>`,
+  and the hook logic moved into the engine.
 - **Gradle can run on JDK 17.** The minimum was JDK 21. Formatters may still require a newer JDK.
 - Error messages and the IntelliJ settings page are in English.
 
 ### Upgrading from 0.1.0
 
-Run `./gradlew spotlessBridgeInstallHook`, point your AI hook at `tools/spotless-bridge/spotless-bridge`, and delete
-`ai-hook.py`. The next hook call prepares the new engine through Gradle once.
+Point your AI hook at `.gradle/spotless-bridge/spotless-bridge` and delete `tools/spotless-bridge/`.
+The launcher appears after the next Gradle run, and its first call prepares the new engine through Gradle once.
 
 ## [0.1.0]
 

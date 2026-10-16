@@ -1,15 +1,11 @@
 #!/bin/sh
-# Spotless Bridge hook launcher, written by ./gradlew spotlessBridgeInstallHook.
-# Usage: spotless-bridge <gradle-root> [files...]
-# Files are relative to the Gradle root or absolute. Formatting logic lives in the project's engine,
-# so this launcher only needs reinstalling when Spotless Bridge warns about it.
+# Spotless Bridge hook launcher. The Gradle plugin writes it to <gradle-root>/.gradle/spotless-bridge/
+# on every Gradle run, so it always matches the plugin version.
+# Usage: .gradle/spotless-bridge/spotless-bridge [files...]
+# Files are relative to the Gradle root or absolute. Formatting logic lives in the project's engine.
 set -eu
-if [ "$#" -lt 1 ]; then
-    echo 'Usage: spotless-bridge <gradle-root> [files...]' >&2
-    exit 2
-fi
-[ "$#" -gt 1 ] || exit 0
-root=$(cd "$1" && pwd -P)
+[ "$#" -gt 0 ] || exit 0
+root=$(cd "$(dirname "$0")/../.." && pwd -P)
 runtime="$root/.gradle/spotless-bridge/client-runtime.txt"
 jar=$( [ -f "$runtime" ] && sed -n 1p "$runtime" || true)
 java_home=$( [ -f "$runtime" ] && sed -n 2p "$runtime" || true)
@@ -19,4 +15,4 @@ if [ ! -f "$jar" ] || [ ! -x "$java_home/bin/java" ]; then
     jar=$(sed -n 1p "$runtime")
     java_home=$(sed -n 2p "$runtime")
 fi
-exec "$java_home/bin/java" -cp "$jar" io.github.pozafly.spotlessbridge.GradleFormatter --hook "$@"
+exec "$java_home/bin/java" -cp "$jar" io.github.pozafly.spotlessbridge.GradleFormatter --hook "$root" "$@"

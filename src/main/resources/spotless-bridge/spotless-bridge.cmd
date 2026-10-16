@@ -1,15 +1,11 @@
 @echo off
-rem Spotless Bridge hook launcher, written by gradlew spotlessBridgeInstallHook.
-rem Usage: spotless-bridge.cmd <gradle-root> [files...]
-rem Files are relative to the Gradle root or absolute. Formatting logic lives in the project's engine,
-rem so this launcher only needs reinstalling when Spotless Bridge warns about it.
+rem Spotless Bridge hook launcher. The Gradle plugin writes it to <gradle-root>\.gradle\spotless-bridge\
+rem on every Gradle run, so it always matches the plugin version.
+rem Usage: .gradle\spotless-bridge\spotless-bridge.cmd [files...]
+rem Files are relative to the Gradle root or absolute. Formatting logic lives in the project's engine.
 setlocal
-if "%~1"=="" (
-    echo Usage: spotless-bridge.cmd ^<gradle-root^> [files...] 1>&2
-    exit /b 2
-)
-if "%~2"=="" exit /b 0
-set "BRIDGE_ROOT=%~f1"
+if "%~1"=="" exit /b 0
+for %%R in ("%~dp0..\..") do set "BRIDGE_ROOT=%%~fR"
 set "BRIDGE_RUNTIME=%BRIDGE_ROOT%\.gradle\spotless-bridge\client-runtime.txt"
 call :read
 if exist "%BRIDGE_JAR%" if exist "%BRIDGE_JAVA%\bin\java.exe" goto run
@@ -23,7 +19,7 @@ if errorlevel 1 (
 popd
 call :read
 :run
-"%BRIDGE_JAVA%\bin\java.exe" -cp "%BRIDGE_JAR%" io.github.pozafly.spotlessbridge.GradleFormatter --hook %*
+"%BRIDGE_JAVA%\bin\java.exe" -cp "%BRIDGE_JAR%" io.github.pozafly.spotlessbridge.GradleFormatter --hook "%BRIDGE_ROOT%" %*
 exit /b %ERRORLEVEL%
 
 :read
