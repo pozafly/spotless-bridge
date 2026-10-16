@@ -129,8 +129,10 @@ hook 런처(`src/main/resources/spotless-bridge/spotless-bridge`, `.cmd`)는 `LI
 
 공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
 게시 자격 증명은 Git에 넣지 않고 저장소 secret `GRADLE_PUBLISH_KEY`, `GRADLE_PUBLISH_SECRET`에 둡니다.
-`release.yml`은 `v<version>` 태그를 push하면 태그와 `gradle.properties`의 버전이 같은지 확인하고 `check engineDist`를 거쳐
-`publishPlugins`를 실행합니다. Actions에서 수동 실행하면 기본값으로 `publishPlugins --validate-only`만 수행합니다.
+태그를 만들기 전에 `CHANGELOG.md`에 `## [<version>]` 섹션을 추가합니다. `release.yml`은 `v<version>` 태그를 push하면 태그와 `gradle.properties`의 버전이 같은지 확인하고 `check engineDist`를 거쳐
+`publishPlugins`를 실행한 뒤, 해당 CHANGELOG 섹션으로 GitHub Release를 만듭니다(이미 있으면 노트를 갱신).
+IntelliJ ZIP은 IDE SDK가 필요해 CI에서 만들지 않으므로, 필요하면 로컬에서 `pluginZip`으로 만들어 Release에 직접 첨부합니다.
+Actions에서 수동 실행하면 기본값으로 `publishPlugins --validate-only`만 수행합니다.
 태그를 push하기 전에 수동 실행으로 메타데이터와 자격 증명을 먼저 확인하세요. 두 옵션의 차이는
 [Gradle 공식 배포 문서](https://docs.gradle.org/current/userguide/publishing_gradle_plugins.html)를 참고하세요.
 이 저장소의 일반 build/check는 공개 게시를 수행하지 않습니다.

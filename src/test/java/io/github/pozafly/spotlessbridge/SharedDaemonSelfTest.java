@@ -136,7 +136,13 @@ public final class SharedDaemonSelfTest {
         Files.writeString(hookDirectory.resolve("ai-hook.py"), "# 0.1.0 hook\n");
         check(gradle(root, "spotlessBridgeStart").contains("is replaced by the launcher"), "legacy Python hook warns");
         Files.delete(hookDirectory.resolve("ai-hook.py"));
-        System.out.println("PASS: hook launcher installation, change warnings and pre-0.1.1 client compatibility");
+        // Partial .gradle cleanup can remove the engine while client-runtime.txt survives; the launcher rebuilds it.
+        Path engineJar = Path.of(Files.readAllLines(root.resolve(".gradle/spotless-bridge/client-runtime.txt")).get(0));
+        Files.delete(engineJar);
+        Files.writeString(file, source);
+        hook(root, file);
+        check(Files.isRegularFile(engineJar) && Files.readString(file).equals(expected), "launcher restores a removed engine JAR");
+        System.out.println("PASS: hook launcher installation, change warnings, engine recovery and pre-0.1.1 client compatibility");
         System.out.println("PASS: hook-only cold start, daemon death, stale endpoint recovery");
 
         // Authentication fails before any format operation and the next valid client still succeeds.

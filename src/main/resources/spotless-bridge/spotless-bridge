@@ -11,10 +11,12 @@ fi
 [ "$#" -gt 1 ] || exit 0
 root=$(cd "$1" && pwd -P)
 runtime="$root/.gradle/spotless-bridge/client-runtime.txt"
-if [ ! -f "$runtime" ]; then
-    # First use: Gradle prepares the engine selected by the project's plugin version.
+jar=$( [ -f "$runtime" ] && sed -n 1p "$runtime" || true)
+java_home=$( [ -f "$runtime" ] && sed -n 2p "$runtime" || true)
+if [ ! -f "$jar" ] || [ ! -x "$java_home/bin/java" ]; then
+    # First use, or the engine was removed with part of .gradle: Gradle prepares the project's engine again.
     (cd "$root" && ./gradlew --console=plain --no-configuration-cache spotlessBridgeStart)
+    jar=$(sed -n 1p "$runtime")
+    java_home=$(sed -n 2p "$runtime")
 fi
-jar=$(sed -n 1p "$runtime")
-java_home=$(sed -n 2p "$runtime")
 exec "$java_home/bin/java" -cp "$jar" io.github.pozafly.spotlessbridge.GradleFormatter --hook "$@"

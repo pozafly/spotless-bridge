@@ -1,5 +1,6 @@
 name: Release to Gradle Plugin Portal
-# Pushing a v<version> tag verifies the build and publishes the Gradle plugin.
+# Pushing a v<version> tag verifies the build, publishes the Gradle plugin, and creates the GitHub Release
+# from that version's CHANGELOG.md section.
 # Run manually to validate the Portal metadata and credentials without publishing.
 on:
   push:
@@ -11,7 +12,7 @@ on:
         type: boolean
         default: false
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: release
   cancel-in-progress: false
@@ -33,6 +34,19 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match version=$version in gradle.properties" >&2
             exit 1
           fi
+      - name: Extract release notes from CHANGELOG.md
+        if: github.event_name == 'push'
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v header="## [$version]" '
+            index($0, header) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found && !/^\[[^]]*\]: / { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "CHANGELOG.md has no section for [$version]" >&2
+            exit 1
+          fi
       - name: Verify
         run: ./gradlew --no-daemon --console=plain check engineDist
       - name: Publish
@@ -49,4 +63,15 @@ jobs:
             ./gradlew --no-daemon --console=plain publishPlugins
           else
             ./gradlew --no-daemon --console=plain publishPlugins --validate-only
+          fi
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Spotless Bridge ${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
           fi
