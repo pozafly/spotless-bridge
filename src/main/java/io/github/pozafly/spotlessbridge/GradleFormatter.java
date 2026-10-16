@@ -112,27 +112,39 @@ public final class GradleFormatter implements AutoCloseable {
      */
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && args[0].equals("--hook")) {
-            if (args.length < 2) throw new IllegalArgumentException("Usage: --hook <gradle-root> [files...]");
-            Path root = Path.of(args[1]).toRealPath();
-            if (args.length == 2) return;
-            StringBuilder paths = new StringBuilder();
-            for (int i = 2; i < args.length; i++) {
-                Path file = root.resolve(args[i]).toRealPath();
-                if (file.toString().contains("\n") || file.toString().contains("\r"))
-                    throw new IllegalArgumentException("Newlines in file names are not supported: " + file);
-                paths.append(file).append('\n');
-            }
-            // The daemon protocol takes a list file; it also keeps spaces and commas in paths intact.
-            Path list = Files.createTempFile(SharedDaemon.state(root), "hook-files-", ".txt");
             try {
-                Files.writeString(list, paths, StandardCharsets.UTF_8);
-                format(root, list);
-            } finally {
-                Files.deleteIfExists(list);
+                hook(args);
+            } catch (Exception e) {
+                // Hooks show this to people and AI agents; the Gradle log path in the message has the details.
+                System.err.println("Spotless Bridge: " + (e instanceof NoSuchFileException missing
+                        ? "file not found: " + missing.getFile()
+                        : e.getMessage() == null ? e.toString() : e.getMessage()));
+                System.exit(1);
             }
             return;
         }
         format(Path.of(args[0]).toRealPath(), Path.of(args[1]));
+    }
+
+    private static void hook(String[] args) throws Exception {
+        if (args.length < 2) throw new IllegalArgumentException("Usage: --hook <gradle-root> [files...]");
+        Path root = Path.of(args[1]).toRealPath();
+        if (args.length == 2) return;
+        StringBuilder paths = new StringBuilder();
+        for (int i = 2; i < args.length; i++) {
+            Path file = root.resolve(args[i]).toRealPath();
+            if (file.toString().contains("\n") || file.toString().contains("\r"))
+                throw new IllegalArgumentException("Newlines in file names are not supported: " + file);
+            paths.append(file).append('\n');
+        }
+        // The daemon protocol takes a list file; it also keeps spaces and commas in paths intact.
+        Path list = Files.createTempFile(SharedDaemon.state(root), "hook-files-", ".txt");
+        try {
+            Files.writeString(list, paths, StandardCharsets.UTF_8);
+            format(root, list);
+        } finally {
+            Files.deleteIfExists(list);
+        }
     }
 
     private static void format(Path root, Path list) throws Exception {
