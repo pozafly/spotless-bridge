@@ -1,6 +1,7 @@
 package io.github.pozafly.spotlessbridge.idea;
 
 import com.intellij.formatting.service.*;
+import com.intellij.ide.trustedProjects.TrustedProjects;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -24,6 +25,7 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
     public boolean canFormat(PsiFile file) {
         VirtualFile virtual = file.getVirtualFile();
         return !file.getProject().isDisposed()
+                && TrustedProjects.isProjectTrusted(file.getProject())
                 && file.getProject().getService(FormatterSettings.class).getState().enabled
                 && "JAVA".equals(file.getLanguage().getID())
                 && virtual != null

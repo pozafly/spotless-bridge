@@ -51,10 +51,16 @@ sourceSets {
     idea {
         compileClasspath += sourceSets.main.output + ideaLibraries
     }
+    ideaTest {
+        compileClasspath += sourceSets.idea.output + sourceSets.main.output + ideaLibraries
+        runtimeClasspath += sourceSets.idea.output + sourceSets.main.output + ideaLibraries
+    }
 }
 configurations { pluginVerifier }
 dependencies {
     pluginVerifier "org.jetbrains.intellij.plugins:verifier-cli:${providers.gradleProperty('pluginVerifierVersion').get()}:all@jar"
+    ideaTestImplementation 'junit:junit:4.13.2'
+    ideaTestImplementation 'org.mockito:mockito-core:5.20.0'
 }
 tasks.register('verifyIdeaSdk') {
     group = 'verification'
@@ -122,10 +128,28 @@ tasks.register('selfTest', JavaExec) {
 tasks.named('check') { dependsOn 'selfTest' }
 
 // IDE verification is explicit so the existing engine compatibility matrix remains SDK-independent.
+tasks.named('compileIdeaTestJava', JavaCompile) {
+    dependsOn 'verifyIdeaSdk'
+    options.fork = true
+    options.forkOptions.executable = new File(ideaJavaHome.get(), 'bin/javac').absolutePath
+    options.release = 21
+    options.compilerArgs += ['-proc:none']
+}
+tasks.register('ideaTest', Test) {
+    group = 'verification'
+    description = 'Verify Safe Mode blocks formatting, including an already cached client'
+    testClassesDirs = sourceSets.ideaTest.output.classesDirs
+    classpath = sourceSets.ideaTest.runtimeClasspath
+    executable = new File(ideaJavaHome.get(), 'bin/java').absolutePath
+    useJUnit()
+    doFirst {
+        jvmArgs "-javaagent:${configurations.ideaTestRuntimeClasspath.find { it.name.startsWith('mockito-core-') }}"
+    }
+}
 tasks.register('verifyIdeaPlugin', JavaExec) {
     group = 'verification'
     description = 'Run the pinned Plugin Verifier against the pinned IntelliJ SDK and packaged ZIP'
-    dependsOn 'verifyIdeaSdk', 'pluginZip'
+    dependsOn 'verifyIdeaSdk', 'ideaTest', 'pluginZip'
     classpath = configurations.pluginVerifier
     mainClass = 'com.jetbrains.pluginverifier.PluginVerifierMain'
     executable = new File(ideaJavaHome.get(), 'bin/java').absolutePath

@@ -1,5 +1,6 @@
 package io.github.pozafly.spotlessbridge.idea;
 
+import com.intellij.ide.trustedProjects.TrustedProjects;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.Disposable;
@@ -25,6 +26,9 @@ public final class ProjectEngine implements Disposable {
 
     private synchronized GradleFormatter formatter(Path source) throws IOException {
         if (disposed || project.isDisposed()) throw new IOException("Project is closed");
+        // Check every request, including cached clients: formatting can evaluate project build scripts.
+        if (!TrustedProjects.isProjectTrusted(project))
+            throw new IOException("Spotless Bridge is unavailable in Safe Mode. Trust the project in IntelliJ before formatting.");
         FormatterSettings.Values settings =
                 project.getService(FormatterSettings.class).getState();
         if (!settings.enabled) throw new IOException("Spotless Bridge is disabled");
