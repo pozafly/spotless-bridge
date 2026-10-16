@@ -33,7 +33,9 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Verify DSL, formatter output and persistent worker
-        run: ./gradlew --no-daemon --console=plain check engineDist
+        env:
+          TEST_JAVA_HOME: ${{ steps.consumer-java.outputs.path }}
+        run: ./gradlew --no-daemon --console=plain check engineDist -PtestGradleVersion=${{ matrix.gradle }} -PtestJavaHome="$TEST_JAVA_HOME"
       - uses: actions/upload-artifact@v4
         with:
           name: spotless-bridge-engine-gradle-${{ matrix.gradle }}-jdk-${{ matrix.java }}
