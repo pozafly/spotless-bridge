@@ -13,10 +13,10 @@ public final class SharedDaemonSelfTest {
         // Use the project-local installation documented in the README.
         Path hookDirectory = root.resolve("tools/spotless-bridge");
         gradle(root, "spotlessBridgeInstallHook");
-        Path installedHook = hookDirectory.resolve("ai-hook.py");
-        String hookScript = Files.readString(installedHook);
-        check(!hookScript.contains("@spotlessBridgeVersion@") && hookScript.contains("BRIDGE_VERSION = '"),
-                "installed hook script carries the plugin version");
+        Path installedHook = hookDirectory.resolve("spotless-bridge");
+        String launcher = Files.readString(installedHook);
+        check(Files.isExecutable(installedHook) && launcher.startsWith("#!/bin/sh"), "POSIX launcher is executable");
+        check(Files.readString(hookDirectory.resolve("spotless-bridge.cmd")).contains("\r\n"), "Windows launcher uses CRLF");
         check(Files.readString(hookDirectory.resolve("LICENSE")).equals(Files.readString(Path.of("LICENSE"))),
                 "hook installation writes the license");
         // A new CLI initially knows only the root; a cached snapshot also watches this external included build.
@@ -120,17 +120,23 @@ public final class SharedDaemonSelfTest {
         Files.delete(added);
         System.out.println("PASS: zero-Gradle warm hooks, one-Gradle cold/config refresh");
 
-        // A script from another plugin version still formats, but both entry points tell the user to reinstall it.
-        Files.writeString(installedHook, hookScript.replaceFirst("BRIDGE_VERSION = '[^']*'", "BRIDGE_VERSION = '0.0.0-old'"));
+        // Launchers keep working across versions; Gradle asks for a reinstall only when the launcher itself changed.
+        Files.writeString(installedHook, launcher + "# locally modified\n");
         Files.writeString(file, source);
-        check(hook(root, file).contains("hook script is 0.0.0-old"), "outdated hook script warns");
-        check(Files.readString(file).equals(expected), "outdated hook script still formats");
-        check(gradle(root, "spotlessBridgeStart").contains("spotlessBridgeInstallHook"), "Gradle start warns about outdated hook");
+        hook(root, file);
+        check(Files.readString(file).equals(expected), "modified launcher still formats");
+        check(gradle(root, "spotlessBridgeStart").contains("differs from the launcher"), "Gradle start warns about changed launcher");
         gradle(root, "spotlessBridgeInstallHook");
-        check(Files.readString(installedHook).equals(hookScript), "reinstall restores the packaged hook");
-        check(!hook(root, file).contains("spotlessBridgeInstallHook"), "matching hook script does not warn");
-        check(!gradle(root, "spotlessBridgeStart").contains("spotlessBridgeInstallHook"), "Gradle start accepts matching hook");
-        System.out.println("PASS: hook installation task and version mismatch warnings");
+        check(Files.readString(installedHook).equals(launcher), "reinstall restores the packaged launcher");
+        check(!gradle(root, "spotlessBridgeStart").contains("spotlessBridgeInstallHook"), "Gradle start accepts packaged launcher");
+        // Hook scripts from 0.1.0 pass a list file instead of paths; the engine still accepts them.
+        Files.writeString(file, source);
+        java(root, root.toString(), list.toString());
+        check(Files.readString(file).equals(expected), "pre-0.1.1 list-file client protocol");
+        Files.writeString(hookDirectory.resolve("ai-hook.py"), "# 0.1.0 hook\n");
+        check(gradle(root, "spotlessBridgeStart").contains("is replaced by the launcher"), "legacy Python hook warns");
+        Files.delete(hookDirectory.resolve("ai-hook.py"));
+        System.out.println("PASS: hook launcher installation, change warnings and pre-0.1.1 client compatibility");
         System.out.println("PASS: hook-only cold start, daemon death, stale endpoint recovery");
 
         // Authentication fails before any format operation and the next valid client still succeeds.
@@ -194,8 +200,7 @@ public final class SharedDaemonSelfTest {
         // Use the shipped hook adapter as an external process, with no editor client alive.
         Path log = Files.createTempFile("shared-daemon-hook-", ".log");
         Process process = new ProcessBuilder(
-                        "python3",
-                        root.resolve("tools/spotless-bridge/ai-hook.py").toAbsolutePath().toString(),
+                        root.resolve("tools/spotless-bridge/spotless-bridge").toAbsolutePath().toString(),
                         root.toString(),
                         file.toString())
                 .redirectErrorStream(true)
@@ -207,6 +212,15 @@ public final class SharedDaemonSelfTest {
         }
         check(process.exitValue() == 0, "Hook failed: " + Files.readString(log));
         return Files.readString(log);
+    }
+
+    private static void java(Path root, String... args) throws Exception {
+        List<String> runtime = Files.readAllLines(root.resolve(".gradle/spotless-bridge/client-runtime.txt"));
+        List<String> command = new ArrayList<>(List.of(
+                Path.of(runtime.get(1), "bin", "java").toString(), "-cp", runtime.get(0), GradleFormatter.class.getName()));
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command).directory(root.toFile()).inheritIO().start();
+        check(process.waitFor(120, TimeUnit.SECONDS) && process.exitValue() == 0, "client failed: " + command);
     }
 
     private static String gradle(Path root, String... args) throws Exception {

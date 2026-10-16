@@ -93,7 +93,7 @@ JDK 17에서 1.30.0을 지정하면 실패하며 파일을 보존하는지, 1.28
 - 기존 `FormatterSelfTest`: Groovy/Kotlin DSL, Spotless 8.10.2/8.0.0, Palantir/Google/Eclipse,
   Gradle 결과 비교, 신규·제외 파일, 없는 파일 요청 후 생성, 설정 변경·실패·복구, 다중 모듈.
 - `ProcessSelfTest`: 문법 오류, worker 재사용·강제 종료 후 복구, timeout, 종료.
-- `SharedDaemonSelfTest`: `spotlessBridgeInstallHook`으로 임시 소비 프로젝트에 hook 스크립트와 `LICENSE`를 설치하고, 버전 불일치 경고를 확인한 뒤 편집기 연결 종료 후 hook 실행,
+- `SharedDaemonSelfTest`: `spotlessBridgeInstallHook`으로 임시 소비 프로젝트에 hook 런처와 `LICENSE`를 설치하고, 런처 변경·0.1.0 스크립트 경고와 이전 호출 방식을 확인한 뒤 편집기 연결 종료 후 hook 실행,
   설정이 같은 등록 대상 파일의 반복 hook에서 Gradle 호출 0회, 시작·설정 변경 시 1회, 공용 PID/worker, 80개 동시 요청, hook만의 시작, stale endpoint 복구, 잘못된 토큰 거부,
   UTF-16LE·CRLF Gradle byte 일치, 외부 includeBuild를 포함한 설정 갱신, 동시 시작, stop과 idle 종료.
 
@@ -108,10 +108,13 @@ Marketplace 승인과 별개입니다. SDK는 `pluginZip`에만 필요합니다.
 라이선스는 MIT이며 `LICENSE`를 모든 JAR의 `META-INF`에 포함하고 Maven POM에도 기록합니다.
 기본 사용 문서는 영문 `README.md`, 한국어 문서는 `README.ko.md`입니다. 동작이나 설치 방법이 바뀌면 둘 다 갱신합니다.
 
-`scripts/ai-hook.py`는 빌드 시 `@spotlessBridgeVersion@`을 플러그인 버전으로 바꿔 `LICENSE`와 함께 플러그인 JAR의
-`spotless-bridge/`에 포함합니다. 사용자는 `spotlessBridgeInstallHook`으로 두 파일을 `tools/spotless-bridge/`
-(또는 `-PspotlessBridgeHookDir`)에 생성합니다. `spotlessBridgeStart`와 hook 스크립트는 설치된 스크립트와
-엔진 JAR에 포함된 스크립트의 `BRIDGE_VERSION`이 다르면 재설치를 안내하는 경고만 출력하고 포맷은 계속합니다.
+hook 런처(`src/main/resources/spotless-bridge/spotless-bridge`, `.cmd`)는 `LICENSE`와 함께 플러그인 JAR의
+`spotless-bridge/`에 포함됩니다. 사용자는 `spotlessBridgeInstallHook`으로 이 파일들을 `tools/spotless-bridge/`
+(또는 `-PspotlessBridgeHookDir`)에 생성합니다. 런처는 `client-runtime.txt`가 없을 때만 `gradlew spotlessBridgeStart`를
+실행하고, 이후 `GradleFormatter --hook <root> <files...>`를 직접 실행합니다. 포맷 로직은 엔진에 있으므로 런처는
+버전과 무관하게 유지하고, 바꿔야 할 때만 내용을 수정합니다. `spotlessBridgeStart`는 설치된 런처가 패키지된 런처와
+다르거나(줄바꿈 차이는 무시) 0.1.0의 `ai-hook.py`가 남아 있으면 경고만 출력합니다. 0.1.0 스크립트가 쓰는
+`<root> <list-file>` 호출 방식도 계속 지원합니다. Windows 런처는 CI에서 검증하지 않습니다.
 
 공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
 게시 자격 증명은 Git에 넣지 않습니다. API 키가 준비된 뒤 `publishPlugins --validate-only`로 확인하고,

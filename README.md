@@ -18,7 +18,7 @@ There is no separate editor style to maintain and no global service to install.
 ## Quick start
 
 You need a Gradle project with Spotless Java formatting configured, its Gradle wrapper,
-**JDK 17 or newer** to run Gradle, and **Python 3** for the AI hook.
+and **JDK 17 or newer** to run Gradle.
 
 ### 1. Apply the plugin
 
@@ -35,24 +35,25 @@ In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.1"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
-### 2. Add the hook script
+### 2. Add the hook launcher
 
-From your project's Gradle root, let the plugin write the hook script and its license:
+From your project's Gradle root, let the plugin write the hook launchers:
 
 ```sh
 ./gradlew spotlessBridgeInstallHook
 ```
 
-This writes `tools/spotless-bridge/ai-hook.py` and `LICENSE` for the plugin version you applied.
-Add `-PspotlessBridgeHookDir=<dir>` to use another directory. Commit both files.
-After upgrading the plugin, run the task again; Bridge warns when the script and plugin versions differ.
+This writes `tools/spotless-bridge/spotless-bridge` for macOS and Linux, `spotless-bridge.cmd` for Windows,
+and their `LICENSE`. Add `-PspotlessBridgeHookDir=<dir>` to use another directory. Commit these files.
+The launchers only start the engine of the plugin version you apply, so a plugin upgrade rarely needs a
+reinstall; Bridge warns when a launcher is out of date. The Windows launcher is not yet covered by CI.
 
 ### 3. Connect your AI tool
 
-Have your AI tool run the script after it edits Java files, passing the Gradle root and the changed files:
+Have your AI tool run the launcher after it edits Java files, passing the Gradle root and the changed files:
 
 ```sh
-JAVA_HOME=/path/to/jdk21 python3 tools/spotless-bridge/ai-hook.py "$PWD" \
+JAVA_HOME=/path/to/jdk21 tools/spotless-bridge/spotless-bridge "$PWD" \
   src/main/java/example/Customer.java \
   src/test/java/example/CustomerTest.java
 ```
@@ -70,7 +71,7 @@ and assumes the Claude Code project directory is the Gradle root:
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 python3 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/ai-hook.py\" \"$CLAUDE_PROJECT_DIR\""
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
           }
         ]
       }
@@ -79,7 +80,8 @@ and assumes the Claude Code project directory is the Gradle root:
 }
 ```
 
-Other AI tools work the same way: collect the Java files the task changed and pass them to the script.
+Other AI tools work the same way: collect the Java files the task changed and pass them to the launcher.
+`JAVA_HOME` is only needed for the first call, which runs Gradle to prepare the engine.
 That's it. The first request starts the daemon, and later requests reuse it.
 
 ## How it works
@@ -146,8 +148,8 @@ for the same combinations. GitHub CI must be rerun after these changes are pushe
 
 - The first argument is the Gradle root; each remaining argument is a file to format.
   Paths can be absolute or relative to the Gradle root. If the hook runs from another directory,
-  use absolute paths for both the script and the Gradle root.
-- Pass only existing files; leave out deleted ones. With no file arguments, the script does nothing.
+  use absolute paths for both the launcher and the Gradle root.
+- Pass only existing files; leave out deleted ones. With no file arguments, the launcher does nothing.
 - Treat a nonzero exit code as a hook failure.
 - The first call prepares the engine through Gradle. Later calls start the engine's Java client directly,
   so known target files are formatted without Gradle while the configuration is unchanged.
@@ -172,7 +174,7 @@ Then pass that file to the apply task:
 ./gradlew --no-configuration-cache spotlessBridgeApply -PspotlessBridgeFiles=/path/to/changed-files.txt
 ```
 
-This approach evaluates Gradle on every run, so prefer the Python script for frequent hooks.
+This approach evaluates Gradle on every run, so prefer the launcher for frequent hooks.
 
 ## IntelliJ IDEA (preview)
 

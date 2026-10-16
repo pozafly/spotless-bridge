@@ -1,0 +1,2 @@
+*.cmd text eol=crlf
+src/main/resources/spotless-bridge/spotless-bridge text eol=lf

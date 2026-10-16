@@ -18,7 +18,7 @@ IDE 포맷 규칙을 따로 맞추거나 전역 서비스를 설치할 필요가
 ## 빠른 시작
 
 Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 Gradle wrapper가 필요합니다.
-Gradle을 실행할 **JDK 17 이상**, AI hook에 사용할 **Python 3**도 준비하세요.
+Gradle을 실행할 **JDK 17 이상**도 준비하세요.
 
 ### 1. 플러그인 적용
 
@@ -35,24 +35,25 @@ Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.1"`을 
 기존 Spotless 버전과 규칙은 그대로 두세요. 다중 프로젝트 빌드에서는 Bridge를 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 그대로 둡니다.
 
-### 2. hook 스크립트 추가
+### 2. hook 런처 추가
 
-프로젝트의 Gradle 루트에서 플러그인으로 hook 스크립트와 라이선스를 생성합니다.
+프로젝트의 Gradle 루트에서 플러그인으로 hook 런처를 생성합니다.
 
 ```sh
 ./gradlew spotlessBridgeInstallHook
 ```
 
-적용한 플러그인 버전에 맞는 `tools/spotless-bridge/ai-hook.py`와 `LICENSE`가 생성됩니다.
-다른 디렉터리를 쓰려면 `-PspotlessBridgeHookDir=<디렉터리>`를 추가하세요. 두 파일은 프로젝트에 커밋합니다.
-플러그인을 업그레이드한 뒤에는 이 태스크를 다시 실행하세요. 스크립트와 플러그인 버전이 다르면 Bridge가 경고합니다.
+macOS·Linux용 `tools/spotless-bridge/spotless-bridge`, Windows용 `spotless-bridge.cmd`와 `LICENSE`가 생성됩니다.
+다른 디렉터리를 쓰려면 `-PspotlessBridgeHookDir=<디렉터리>`를 추가하세요. 생성된 파일은 프로젝트에 커밋합니다.
+런처는 적용한 플러그인 버전의 엔진을 실행하기만 하므로, 플러그인을 업그레이드해도 다시 설치할 일은 거의 없습니다.
+런처를 갱신해야 하면 Bridge가 경고합니다. Windows 런처는 아직 CI에서 검증하지 않습니다.
 
 ### 3. AI 도구 연결
 
-AI 도구가 Java 파일을 수정한 뒤 Gradle 루트와 변경한 파일을 넘겨 스크립트를 실행하도록 설정합니다.
+AI 도구가 Java 파일을 수정한 뒤 Gradle 루트와 변경한 파일을 넘겨 런처를 실행하도록 설정합니다.
 
 ```sh
-JAVA_HOME=/path/to/jdk21 python3 tools/spotless-bridge/ai-hook.py "$PWD" \
+JAVA_HOME=/path/to/jdk21 tools/spotless-bridge/spotless-bridge "$PWD" \
   src/main/java/example/Customer.java \
   src/test/java/example/CustomerTest.java
 ```
@@ -70,7 +71,7 @@ Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 python3 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/ai-hook.py\" \"$CLAUDE_PROJECT_DIR\""
+            "command": "jq -r '.tool_input.file_path // empty' | grep '\\.java$' | tr '\\n' '\\0' | JAVA_HOME=/path/to/jdk21 xargs -0 \"$CLAUDE_PROJECT_DIR/tools/spotless-bridge/spotless-bridge\" \"$CLAUDE_PROJECT_DIR\""
           }
         ]
       }
@@ -79,7 +80,8 @@ Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
 }
 ```
 
-다른 AI 도구도 같은 방식입니다. 작업에서 변경한 Java 파일을 모아 스크립트에 넘기면 됩니다.
+다른 AI 도구도 같은 방식입니다. 작업에서 변경한 Java 파일을 모아 런처에 넘기면 됩니다.
+`JAVA_HOME`은 Gradle로 엔진을 준비하는 첫 실행에만 필요합니다.
 설정은 여기까지입니다. 첫 요청에서 daemon이 시작되고, 이후 요청은 같은 daemon을 재사용합니다.
 
 ## 어떻게 동작하나요?
@@ -145,7 +147,7 @@ Ubuntu CI도 같은 조합을 실행하도록 구성했습니다. 이번 변경�
 
 - 첫 번째 인자는 Gradle 루트이고, 나머지 인자는 각각 포맷할 파일입니다.
   파일 경로는 Gradle 루트 기준 상대 경로와 절대 경로 모두 쓸 수 있습니다.
-  hook을 다른 디렉터리에서 실행한다면 스크립트와 Gradle 루트를 절대 경로로 지정하세요.
+  hook을 다른 디렉터리에서 실행한다면 런처와 Gradle 루트를 절대 경로로 지정하세요.
 - 삭제된 파일은 빼고 실제로 있는 파일만 넘기세요. 파일 인자가 없으면 아무것도 하지 않습니다.
 - 명령이 0이 아닌 종료 코드를 반환하면 hook을 실패로 처리하세요.
 - 처음 실행할 때는 Gradle로 엔진을 준비합니다. 이후에는 엔진의 Java 클라이언트를 직접 실행하므로,
@@ -171,7 +173,7 @@ src/test/java/example/CustomerTest.java
 ./gradlew --no-configuration-cache spotlessBridgeApply -PspotlessBridgeFiles=/path/to/changed-files.txt
 ```
 
-이 방식은 매번 Gradle을 평가하므로, 자주 실행되는 hook에는 Python 스크립트를 사용하세요.
+이 방식은 매번 Gradle을 평가하므로, 자주 실행되는 hook에는 런처를 사용하세요.
 
 ## IntelliJ IDEA (미리보기)
 
