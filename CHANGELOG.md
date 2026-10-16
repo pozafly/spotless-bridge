@@ -3,6 +3,13 @@
 All notable changes to Spotless Bridge are documented here. The release workflow publishes the section
 for each `v<version>` tag as its GitHub Release notes.
 
+## [0.2.0] - Unreleased
+
+- Bundle a Rust hook client in the Gradle plugin, selected and installed per OS/CPU without a separate user runtime.
+- Apply hook batches inside the existing Java daemon, avoiding a new client JVM on warm requests.
+- Refresh through Gradle once when needed; never automatically retry an ambiguous response after sending an apply request.
+- Add native packaging and consumer checks for macOS, Linux and Windows on x64 and ARM64.
+
 ## [0.1.1]
 
 First release published to the Gradle Plugin Portal.

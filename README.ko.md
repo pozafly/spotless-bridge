@@ -23,6 +23,60 @@ Gradle 설정 평가와 태스크 실행을 기다려야 했습니다.
 Prettier를 불러와 포맷합니다. Spotless Bridge는 같은 아이디어를 Spotless에 적용해,
 **메모리를 조금 더 쓰더라도 포맷할 때마다 기다리지 않게** 합니다.
 
+## 네이티브 hook 클라이언트 (0.2.0 개발판)
+
+0.2.0은 아직 게시하지 않았습니다. 사용하려면 [소스 설치 안내](docs/install-from-source.ko.md)를 따르세요.
+Gradle 플러그인에 Rust CLI가 포함됩니다. 플러그인이 적용되는 Gradle 실행 때 현재 OS·CPU에 맞는 실행 파일을
+프로젝트의 `.gradle/spotless-bridge/` 아래에 준비하며, 기존 hook 명령은 그대로 사용합니다.
+사용자는 **Rust·Node.js·Python·전역 CLI를 설치하거나 별도 다운로드 명령을 실행할 필요가 없습니다.**
+Gradle과 Java daemon을 위한 JDK 17 이상은 계속 필요합니다.
+
+지원 환경의 예열된 hook은 `런처 → 네이티브 CLI → 기존 Java daemon`으로 실행됩니다.
+요청 전달용 JVM과 Gradle을 새로 실행하지 않습니다. 설정 검증·대상 선택·포맷·파일 저장은 daemon이 담당합니다.
+서버가 없거나 종료된 경우, 설정이 바뀐 경우, 새 경로를 만난 경우에만 daemon 밖에서 Gradle을 한 번 실행합니다.
+요청 전송 후 통신이 끊기면 중복 쓰기를 막기 위해 자동 재시도하지 않습니다.
+
+배포 빌드는 macOS·Linux·Windows의 x64·ARM64 실행 파일 여섯 개를 모읍니다. Linux는 정적 musl 빌드입니다.
+그 밖의 환경은 기존 Java 클라이언트를 사용합니다. 플랫폼별 실제 빌드·설치는 여섯 native CI job에서 검사하며,
+CI 실행 전에는 전체 OS 검증 완료로 간주하지 않습니다. 로컬 소스 빌드에는 현재 컴퓨터용 CLI만 포함됩니다.
+
+## 포맷 속도 비교
+
+**0.2.0 개발 빌드에서 Rust CLI 직접 요청은 약 14ms, 기존 AI hook 런처 전체는 약 22ms였습니다.**
+이 샘플에서 hook 전체는 **`spotlessApply`보다 약 22배**, **Java hook 클라이언트보다 약 5.2배** 빨랐습니다.
+
+| 실행 경로 | 중앙값 | 시간에 포함된 작업 |
+| --- | ---: | --- |
+| **Rust CLI — 직접 요청** | **14ms** | 네이티브 프로세스 시작, 설정 확인, daemon 요청, 포맷, 파일 쓰기 |
+| **AI hook — 프로젝트 런처 → Rust CLI** | **22ms** | 셸 런처와 위 네이티브 요청 전체 |
+| **IntelliJ 플러그인 — 상주 포맷 클라이언트¹** | **10ms** | 실행 중인 JVM의 클라이언트 호출, 설정 확인, daemon 요청, 포맷 결과 반환 |
+| Java hook 클라이언트 — 대체 경로 | 114ms | 새 클라이언트 JVM 시작, 설정 확인, daemon 요청, 포맷, 파일 쓰기 |
+| `./gradlew spotlessApply` | 483ms | Gradle 명령 전체 실행과 파일 쓰기 |
+| `./gradlew spotlessBridgeApply` | 495ms | Gradle 명령 전체 실행과 파일 쓰기 |
+
+¹ IntelliJ 행은 플러그인이 사용하는 동일한 상주 `GradleFormatter.format` 클라이언트와 줄바꿈 정규화를
+별도 Java 측정 프로그램에서 실행한 값입니다. IDE 이벤트 전달, 문서 반영, 디스크 저장, 화면 갱신은 제외했습니다.
+실제 IDE에서 저장 버튼을 누른 전체 시간은 아닙니다. 네이티브 경로에는 프로세스 시작과 파일 쓰기도 포함되므로
+측정 범위가 다릅니다. hook 시간에는 AI 제품 자체의 이벤트 전달 시간도 포함되지 않습니다.
+
+AI hook에는 프로젝트 런처를 사용하세요. 두 `./gradlew` 명령은 호출할 때마다 빌드를 평가합니다.
+네이티브 런처는 설정이 같고 이미 알려진 대상 파일이면 Gradle과 새 클라이언트 JVM 없이 daemon을 재사용합니다.
+daemon이 없거나 설정이 바뀌었거나 새 경로를 요청하면 Gradle 준비가 필요합니다.
+
+2026년 10월 16일, **아직 공개 배포하지 않은 로컬 0.2.0 개발 빌드**, macOS ARM64,
+Corretto JDK 21.0.6, Gradle 8.14.3, Spotless 8.10.2, Google Java Format 1.30.0으로 측정했습니다.
+매번 같은 미포맷 1,545바이트 Java 파일을 사용해 경로별로 다섯 번 예열하고 스무 번 측정하며 순서를 바꿨습니다.
+두 daemon이 준비된 상태에서 configuration cache를 껐고, 모든 포맷 결과는 `spotlessApply`와 바이트 단위로 같았습니다.
+준비된 네이티브 요청의 **Gradle 호출은 0회**, daemon PID도 같았습니다. CLI 직접 요청은 12~17ms,
+런처 요청은 20~26ms 범위였습니다. Gradle은 준비됐지만 Bridge daemon이 없는 첫 hook 요청은 한 번 측정했을 때
+**1.56초**였습니다. 의존성 다운로드는 제외했습니다. 다른 프로젝트나 OS의 지연 시간을 보장하는 수치는 아닙니다.
+[원본 측정값](docs/benchmarks/native-2026-10-16.json).
+
+이전에 별도로 측정한 Java 클라이언트 묶음 최적화는 0.1.1 개발 빌드와 88바이트 파일을 사용했고,
+20개 파일의 시간이 260ms에서 171ms로 줄었습니다. 이는 과거 Java 클라이언트 결과이며 Rust 묶음 측정값은 아닙니다.
+작업 종료 hook에서는 변경 파일을 모아 한 번에 넘기는 것을 권장합니다.
+[이전 측정값과 조건](docs/benchmarks/latency-2026-10-16.json).
+
 ## 빠른 시작
 
 Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 Gradle wrapper가 필요합니다.
@@ -65,11 +119,16 @@ JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
   src/test/java/example/CustomerTest.java
 ```
 
+작업 종료 hook에서는 위 예시처럼 변경한 Java 파일을 모아 한 번에 넘기는 것을 권장합니다.
+Java 클라이언트 하나가 전체 파일의 설정과 daemon 상태를 함께 확인합니다.
+새 파일이나 제외 파일로 인한 준비 단계의 Gradle 갱신도 파일마다 반복하지 않고 묶음당 한 번만 실행합니다.
+런처가 서로 다른 hook 이벤트를 자동으로 모아 주는 것은 아닙니다.
+
 `JAVA_HOME`은 JDK 17 이상이어야 하며, 런처가 Gradle로 엔진을 준비할 때만 사용합니다.
 Windows에서는 `.gradle\spotless-bridge\spotless-bridge.cmd`를 사용합니다.
 
-예를 들어 Claude Code에서는 `.claude/settings.json`에 `PostToolUse` hook을 추가하면,
-Claude가 Java 파일을 수정할 때마다 바로 포맷합니다. 이 예시는 `jq`로 수정한 파일 경로를 읽으며,
+수정 직후 포맷하는 방식이 필요하다면 Claude Code의 `.claude/settings.json`에 `PostToolUse` hook을 추가하세요.
+그러면 Claude가 Java 파일을 수정할 때마다 바로 포맷합니다. 이 예시는 `jq`로 수정한 파일 경로를 읽으며,
 Claude Code 프로젝트 디렉터리가 Gradle 루트라고 가정합니다.
 
 ```json

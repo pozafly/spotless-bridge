@@ -23,6 +23,62 @@ answer editor requests, and the [Prettier VS Code extension](https://github.com/
 loads the project's own Prettier. Spotless Bridge applies the same idea to Spotless: it **spends a little
 memory to keep the formatter ready instead of waiting for it on every edit**.
 
+## Native hook client (0.2.0 development)
+
+Version 0.2.0 is not published yet; use the [source installation guide](docs/install-from-source.md) to try it.
+The Gradle plugin now includes a Rust CLI. Applying the plugin during a Gradle run installs the matching
+executable under the project's `.gradle/spotless-bridge/`; existing hook commands stay the same.
+Users do **not** need Rust, Node.js, Python, a global CLI installation, or a separate download command.
+JDK 17+ is still required for Gradle and the Java daemon.
+
+On supported platforms, warm hooks use `launcher → native CLI → existing Java daemon`, with no new
+client JVM or Gradle invocation. The daemon validates settings, selects targets, formats and writes the files.
+Missing/stopped daemons, changed settings and new paths trigger one Gradle preparation outside the daemon.
+Communication failures after sending a request are reported without an automatic retry.
+
+The release build collects clients for macOS, Linux and Windows on x64 and ARM64. Linux uses static musl
+builds. Other platforms retain the Java client. The six native CI jobs build and test each packaged client;
+these jobs must pass before claiming cross-platform verification. Local source builds include only the host client.
+
+## Formatting latency
+
+**The 0.2.0 development build took about 14 ms through the Rust CLI, or 22 ms through the existing AI hook launcher.**
+The complete hook was about **22× faster than `spotlessApply`** and **5.2× faster than the Java hook client** in this sample.
+
+| Route | Median | What is timed |
+| --- | ---: | --- |
+| **Rust CLI — direct request** | **14 ms** | Native process startup, settings checks, daemon request, formatting and file write |
+| **AI hook — project launcher → Rust CLI** | **22 ms** | Shell launcher and the complete native request above |
+| **IntelliJ plugin — persistent formatter client¹** | **10 ms** | In-process client call, settings checks, daemon request and formatted text returned |
+| Java hook client — fallback | 114 ms | New client JVM, settings checks, daemon request, formatting and file write |
+| `./gradlew spotlessApply` | 483 ms | Complete Gradle command and file write |
+| `./gradlew spotlessBridgeApply` | 495 ms | Complete Gradle command and file write |
+
+¹ The IntelliJ row measures the same persistent `GradleFormatter.format` client used by the plugin,
+plus its line-ending normalization, in a standalone Java harness. IDE event dispatch, document application,
+disk save and UI rendering are excluded. It is not a timed IDE save action.
+The native routes include process startup and disk writes, so the measurement boundaries differ.
+The hook timings also exclude the AI product's own event dispatch.
+
+Use the project launcher for AI hooks. Both `./gradlew` commands still evaluate the build on each invocation;
+the native launcher reuses the daemon without Gradle or a new client JVM for known targets while settings are unchanged.
+Missing daemons, changed settings and new paths still require Gradle preparation.
+
+Measured on October 16, 2026 with a **local, unpublished 0.2.0 development build**, macOS ARM64,
+Corretto JDK 21.0.6, Gradle 8.14.3, Spotless 8.10.2, and Google Java Format 1.30.0.
+Each route received the same unformatted 1,545-byte Java file: five warm-ups and twenty measured runs,
+with the execution order rotated. Both daemons were warm, configuration cache was disabled,
+and every formatting result matched `spotlessApply` byte for byte. Warm native requests made **zero Gradle calls**
+and retained the same daemon PID. Direct native calls ranged from 12–17 ms, and launcher calls from 20–26 ms.
+A single first hook request, with Gradle warm but no Bridge daemon prepared, took **1.56 s**.
+Dependency downloads were excluded. These are local sample results, not latency guarantees for other projects or platforms.
+[Raw measurements](docs/benchmarks/native-2026-10-16.json).
+
+Earlier Java-client batching measurements used a separate 0.1.1 development build and smaller, 88-byte files:
+20 files improved from 260 ms to 171 ms after batching preparation. These are historical Java-client results,
+not Rust batch measurements. Task-completion hooks should still pass all changed files in one invocation.
+[Earlier measurements and conditions](docs/benchmarks/latency-2026-10-16.json).
+
 ## Quick start
 
 You need a Gradle project with Spotless Java formatting configured and its Gradle wrapper.
@@ -64,10 +120,16 @@ JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
   src/test/java/example/CustomerTest.java
 ```
 
+For task-completion hooks, pass all changed Java files in one invocation, as above.
+One Java client prepares the whole batch; configuration and daemon checks are shared across the files,
+and new or excluded files trigger one preparation refresh for the batch instead of one per file.
+The launcher does not queue separate hook events.
+
 `JAVA_HOME` must point to JDK 17 or newer. It is only used when the launcher runs Gradle to prepare the engine.
 On Windows, use `.gradle\spotless-bridge\spotless-bridge.cmd`.
 
-For example, in Claude Code you can add a `PostToolUse` hook to `.claude/settings.json`.
+If you prefer immediate formatting after each edit, in Claude Code you can add a `PostToolUse` hook
+to `.claude/settings.json`.
 It formats each Java file right after Claude edits it. This example uses `jq` to read the edited path
 and assumes the Claude Code project directory is the Gradle root:
 
