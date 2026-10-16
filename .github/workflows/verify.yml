@@ -7,7 +7,10 @@ on:
 permissions:
   contents: read
 jobs:
+  native-clients:
+    uses: ./.github/workflows/native.yml
   gradle-and-worker:
+    needs: native-clients
     name: ${{ matrix.os || 'ubuntu-latest' }} / Consumer Gradle ${{ matrix.gradle }} / JDK ${{ matrix.java }}
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     timeout-minutes: 20
@@ -30,6 +33,12 @@ jobs:
             java: "21"
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: build/native
+
       - name: Set up consumer JDK
         id: consumer-java
         uses: actions/setup-java@v4
@@ -44,7 +53,7 @@ jobs:
       - name: Verify DSL, formatter output and persistent worker
         env:
           TEST_JAVA_HOME: ${{ steps.consumer-java.outputs.path }}
-        run: ./gradlew --no-daemon --console=plain check engineDist -PtestGradleVersion=${{ matrix.gradle }} -PtestJavaHome="$TEST_JAVA_HOME"
+        run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native check engineDist -PtestGradleVersion=${{ matrix.gradle }} -PtestJavaHome="$TEST_JAVA_HOME"
       - uses: actions/upload-artifact@v4
         with:
           name: spotless-bridge-engine-${{ matrix.os || 'ubuntu-latest' }}-gradle-${{ matrix.gradle }}-jdk-${{ matrix.java }}
@@ -52,6 +61,7 @@ jobs:
           if-no-files-found: error
 
   intellij-build:
+    needs: native-clients
     name: Build IntelliJ ZIP with minimum SDK
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -59,6 +69,12 @@ jobs:
       versions: ${{ steps.targets.outputs.versions }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: build/native
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -79,7 +95,7 @@ jobs:
           rm "$archive"
       - name: Test Safe Mode and build one ZIP
         run: |
-          ./gradlew --no-daemon --console=plain ideaTest pluginZip -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
+          ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native ideaTest pluginZip -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
           cd build/distributions
           sha256sum spotless-bridge-*.zip > SHA256SUMS
       - uses: actions/upload-artifact@v4
@@ -131,7 +147,7 @@ jobs:
         run: |
           (cd build/distributions && sha256sum --check SHA256SUMS)
           zip=$(find "$PWD/build/distributions" -maxdepth 1 -name 'spotless-bridge-*.zip')
-          ./gradlew --no-daemon --console=plain verifyIdeaPlugin \
+          ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native verifyIdeaPlugin \
             -PideaPluginZip="$zip" -PideaVerifyVersion="$IDEA_VERSION" -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
           (cd build/distributions && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@v4

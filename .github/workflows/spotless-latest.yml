@@ -8,12 +8,21 @@ on:
 permissions:
   contents: read
 jobs:
+  native-clients:
+    uses: ./.github/workflows/native.yml
   latest-spotless:
+    needs: native-clients
     name: Latest Spotless / Gradle 9.8.1 / JDK 21
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: build/native
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,4 +36,4 @@ jobs:
           echo "Latest Spotless: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Verify Bridge with the latest Spotless
-        run: ./gradlew --no-daemon --console=plain check engineDist -PtestGradleVersion=9.8.1 -PtestSpotlessVersion=${{ steps.spotless.outputs.version }}
+        run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native check engineDist -PtestGradleVersion=9.8.1 -PtestSpotlessVersion=${{ steps.spotless.outputs.version }}
