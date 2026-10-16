@@ -18,7 +18,8 @@ There is no separate editor style to maintain and no global service to install.
 ## Quick start
 
 You need a Gradle project with Spotless Java formatting configured, its Gradle wrapper,
-and **JDK 17 or newer** to run Gradle.
+and at least **Gradle 8.14.3, Spotless 8.0.0, and JDK 17**.
+See [Requirements and compatibility](#requirements-and-compatibility) for accepted ranges and runtime settings.
 
 ### 1. Apply the plugin
 
@@ -114,7 +115,20 @@ The daemon shuts down after 30 minutes without requests and starts again on the 
 
 ## Requirements and compatibility
 
-- Gradle must run on **JDK 17 or newer**: the JDK in `JAVA_HOME` when you call `./gradlew` or the hook.
+| Tool | Minimum version | Accepted range |
+| --- | --- | --- |
+| Gradle | 8.14.3 | 8.14.3 or newer, below 10.0 |
+| Spotless Gradle plugin | 8.0.0 | 8.x |
+| JDK running Gradle | 17 | 17 or newer, supported by your Gradle and formatter versions |
+
+`./gradlew spotlessBridgeStart` fails without starting a daemon when a minimum version is not met.
+Gradle is checked when the plugin is applied; Spotless is checked before the start task exports its configuration.
+On a JDK older than 17, Gradle rejects the plugin before loading it and reports the current and required Java versions.
+Update your Gradle wrapper and Spotless plugin to the ranges above, and run Gradle on JDK 17 or newer.
+
+- The JDK requirement applies to the **JVM running Gradle**, not the project's Java source level or compilation toolchain.
+  Check `JAVA_HOME` for terminal and hook calls, and **Gradle JVM** in IntelliJ.
+  Also check `org.gradle.java.home` or daemon JVM criteria if configured.
 - Formatter libraries can require a newer JDK than Bridge. The tests use Google Java Format **1.28.0 on JDK 17**
   and **1.30.0 on JDK 21/25**; 1.30.0 requires JDK 21+. Bridge preserves the project's chosen version and reports
   incompatibility instead of silently downgrading it. Palantir 2.97.0/2.96.0 and the fixture's Eclipse configuration are also tested.
@@ -122,6 +136,9 @@ The daemon shuts down after 30 minutes without requests and starts again on the 
 - CI verifies Bridge on Linux and macOS. The Windows launcher is included but not yet verified.
 - Not supported: Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, and non-serializable formatting steps.
   Run Bridge tasks with `--no-configuration-cache` if your build enables the configuration cache.
+- Bridge accepts Gradle **8.14.3 or newer, below 10.0**, and Spotless **8.x**. Versions within these ranges
+  but outside the verification table produce a warning; other versions stop with an error before formatting.
+  The error includes the detected version and the accepted range.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
 
 The current 0.1.1 source is tested with these combinations. JDK 17 support is not included in the existing `v0.1.0` release,
@@ -139,7 +156,7 @@ which still requires JDK 21; use the [source installation guide](docs/install-fr
 | 21 | 9.8.1 | Same checks |
 | 25 | 9.8.1 | Same checks |
 
-Other versions may work, but these are the only combinations tested. JDK 25 has not been tested with
+Other combinations within the accepted version ranges run with a warning when a Gradle or Spotless version is outside the verified list. JDK 25 has not been tested with
 Gradle 8.x or 9.0.0. The suite covers Groovy and Kotlin DSL, output parity with plain Spotless,
 new and excluded files, configuration refresh, shared daemon reuse, concurrent requests, and hooks
 running without an IDE. All nine combinations were checked locally on macOS; the Ubuntu CI matrix is configured

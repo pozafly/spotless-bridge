@@ -18,7 +18,8 @@ IDE 포맷 규칙을 따로 맞추거나 전역 서비스를 설치할 필요가
 ## 빠른 시작
 
 Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 Gradle wrapper가 필요합니다.
-Gradle을 실행할 **JDK 17 이상**도 준비하세요.
+최소 **Gradle 8.14.3 · Spotless 8.0.0 · JDK 17**이 필요합니다.
+허용 범위와 실행 환경은 아래 [요구 사항과 호환성](#요구-사항과-호환성)을 참고하세요.
 
 ### 1. 플러그인 적용
 
@@ -114,7 +115,20 @@ daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다�
 
 ## 요구 사항과 호환성
 
-- Gradle을 실행하는 JDK, 즉 `./gradlew`나 hook을 실행할 때의 `JAVA_HOME`이 **JDK 17 이상**이어야 합니다.
+| 도구 | 최소 버전 | 허용 범위 |
+| --- | --- | --- |
+| Gradle | 8.14.3 | 8.14.3 이상, 10.0 미만 |
+| Spotless Gradle 플러그인 | 8.0.0 | 8.x |
+| Gradle 실행 JDK | 17 | 17 이상이며, 사용하는 Gradle과 포매터가 지원하는 JDK |
+
+`./gradlew spotlessBridgeStart`를 실행할 때 최소 버전보다 낮으면 daemon을 시작하지 않고 실패합니다.
+Gradle 버전은 플러그인 적용 시, Spotless 버전은 시작 태스크에서 설정을 내보내기 전에 검사합니다.
+JDK가 17보다 낮으면 Gradle이 플러그인을 불러오기 전에 현재 Java 버전과 필요한 최소 버전을 안내합니다.
+Gradle wrapper와 Spotless 플러그인 버전을 위 범위에 맞추고, Gradle 실행 JDK를 17 이상으로 설정하세요.
+
+- JDK 기준은 프로젝트의 Java 소스나 컴파일 toolchain이 아니라 **Gradle을 실행하는 JVM**입니다.
+  터미널과 hook에서는 `JAVA_HOME`을, IntelliJ에서는 **Gradle JVM**을 확인하세요.
+  `org.gradle.java.home`이나 daemon JVM criteria를 지정했다면 해당 설정도 확인하세요.
 - 포매터 라이브러리가 Bridge보다 높은 JDK를 요구할 수 있습니다. 테스트는 JDK 17에서 **Google Java Format 1.28.0**,
   JDK 21·25에서 **1.30.0**을 사용합니다. 1.30.0은 JDK 21 이상이 필요하며, Bridge는 프로젝트가 선택한 버전을
   자동으로 낮추지 않고 호환 오류를 전달합니다. Palantir 2.97.0·2.96.0과 테스트의 Eclipse 설정도 검사합니다.
@@ -122,6 +136,8 @@ daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다�
 - CI는 Linux와 macOS에서 검증합니다. Windows 런처도 포함되어 있지만 아직 검증하지 않았습니다.
 - Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, 직렬화할 수 없는 포맷 단계는 지원하지 않습니다.
   빌드에서 configuration cache를 켜 두었다면 Bridge 태스크는 `--no-configuration-cache`로 실행하세요.
+- Gradle은 **8.14.3 이상·10.0 미만**, Spotless는 **8.x**를 허용합니다. 범위 안에서 아래 표에 없는 버전은
+  경고를 표시하고 계속 실행합니다. 범위를 벗어나면 포맷 전에 중단하며, 감지한 버전과 허용 범위를 오류에 표시합니다.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
 
 현재 0.1.1 소스는 다음 조합으로 검증했습니다. 기존 `v0.1.0` 릴리스에는 JDK 17 지원이 없으며 JDK 21이 필요합니다.
@@ -139,7 +155,7 @@ daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다�
 | 21 | 9.8.1 | 동일한 검사 |
 | 25 | 9.8.1 | 동일한 검사 |
 
-다른 버전에서도 동작할 수 있지만, 검증한 조합은 위 표뿐입니다. JDK 25와 Gradle 8.x 또는 9.0.0의 조합은
+허용 범위 안에서도 검증 목록에 없는 Gradle·Spotless 버전은 경고를 표시하고 실행합니다. JDK 25와 Gradle 8.x 또는 9.0.0의 조합은
 검증하지 않았습니다. 검사 항목은 Groovy/Kotlin DSL, 일반 Spotless와의 결과 일치, 신규·제외 파일, 설정 갱신,
 공용 daemon 재사용, 동시 요청, IDE 없이 실행하는 hook입니다. 아홉 조합은 로컬 macOS에서 확인했으며,
 Ubuntu CI도 같은 조합을 실행하도록 구성했습니다. 이번 변경을 push한 뒤 GitHub CI에서 다시 확인해야 합니다.
