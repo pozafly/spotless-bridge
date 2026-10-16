@@ -71,7 +71,7 @@ class major version 65가 유지됨을 확인했습니다. 임의의 상위 JDK�
 - 기존 `FormatterSelfTest`: Groovy/Kotlin DSL, Spotless 8.10.2/8.0.0, Palantir/Google/Eclipse,
   Gradle 결과 비교, 신규·제외 파일, 없는 파일 요청 후 생성, 설정 변경·실패·복구, 다중 모듈.
 - `ProcessSelfTest`: 문법 오류, worker 재사용·강제 종료 후 복구, timeout, 종료.
-- `SharedDaemonSelfTest`: `scripts/ai-hook.py`와 `LICENSE`를 임시 소비 프로젝트로 복사한 뒤 편집기 연결 종료 후 hook 실행,
+- `SharedDaemonSelfTest`: `spotlessBridgeInstallHook`으로 임시 소비 프로젝트에 hook 스크립트와 `LICENSE`를 설치하고, 버전 불일치 경고를 확인한 뒤 편집기 연결 종료 후 hook 실행,
   설정이 같은 등록 대상 파일의 반복 hook에서 Gradle 호출 0회, 시작·설정 변경 시 1회, 공용 PID/worker, 80개 동시 요청, hook만의 시작, stale endpoint 복구, 잘못된 토큰 거부,
   UTF-16LE·CRLF Gradle byte 일치, 외부 includeBuild를 포함한 설정 갱신, 동시 시작, stop과 idle 종료.
 
@@ -86,10 +86,10 @@ Marketplace 승인과 별개입니다. SDK는 `pluginZip`에만 필요합니다.
 라이선스는 MIT이며 `LICENSE`를 모든 JAR의 `META-INF`에 포함하고 Maven POM에도 기록합니다.
 기본 사용 문서는 영문 `README.md`, 한국어 문서는 `README.ko.md`입니다. 동작이나 설치 방법이 바뀌면 둘 다 갱신합니다.
 
-hook 스크립트는 소비 프로젝트에 자동 설치하지 않습니다. 공개 출시 시 버전과 같은 `v<version>` 태그의
-소스 압축 파일에 `scripts/ai-hook.py`와 `LICENSE`가 포함되어야 합니다. 사용자는 두 파일을
-프로젝트의 `tools/spotless-bridge/`로 복사하고 플러그인과 함께 버전을 갱신합니다.
-공개 출시 전에는 `docs/install-from-source.md`의 로컬 복사 절차를 사용합니다. Release/태그를 실제로 공개한 뒤 미게시 안내를 갱신하세요.
+`scripts/ai-hook.py`는 빌드 시 `@spotlessBridgeVersion@`을 플러그인 버전으로 바꿔 `LICENSE`와 함께 플러그인 JAR의
+`spotless-bridge/`에 포함합니다. 사용자는 `spotlessBridgeInstallHook`으로 두 파일을 `tools/spotless-bridge/`
+(또는 `-PspotlessBridgeHookDir`)에 생성합니다. `spotlessBridgeStart`와 hook 스크립트는 설치된 스크립트와
+엔진 JAR에 포함된 스크립트의 `BRIDGE_VERSION`이 다르면 재설치를 안내하는 경고만 출력하고 포맷은 계속합니다.
 
 공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
 게시 자격 증명은 Git에 넣지 않습니다. API 키가 준비된 뒤 `publishPlugins --validate-only`로 확인하고,

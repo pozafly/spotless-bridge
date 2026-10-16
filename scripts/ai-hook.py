@@ -3,8 +3,29 @@
 import argparse
 import os
 from pathlib import Path
+import re
 import subprocess
+import sys
 import tempfile
+import zipfile
+
+# Replaced with the plugin version when the script is packaged; spotlessBridgeInstallHook writes the packaged copy.
+BRIDGE_VERSION = '@spotlessBridgeVersion@'
+
+
+def warn_if_outdated(jar: str) -> None:
+    """Warn when this script and the project's engine come from different Spotless Bridge versions."""
+    if BRIDGE_VERSION.startswith('@'):
+        return
+    try:
+        with zipfile.ZipFile(jar) as engine:
+            packaged = engine.read('spotless-bridge/ai-hook.py').decode('utf-8')
+    except (OSError, KeyError, zipfile.BadZipFile):
+        return  # Older engines do not package the hook script.
+    match = re.search(r"^BRIDGE_VERSION = '([^']*)'$", packaged, re.MULTILINE)
+    if match and match.group(1) != BRIDGE_VERSION:
+        print(f'Spotless Bridge: this hook script is {BRIDGE_VERSION} but the project uses {match.group(1)}. '
+              'Run ./gradlew spotlessBridgeInstallHook to update it.', file=sys.stderr)
 
 
 def main() -> int:
@@ -31,6 +52,7 @@ def main() -> int:
             if bootstrap.returncode:
                 return bootstrap.returncode
         jar, java_home = runtime.read_text(encoding='utf-8').splitlines()
+        warn_if_outdated(jar)
         java = Path(java_home) / 'bin' / ('java.exe' if os.name == 'nt' else 'java')
         return subprocess.run([str(java), '-cp', jar, 'io.github.pozafly.spotlessbridge.GradleFormatter',
                                str(root), str(selected)], cwd=root, timeout=180).returncode

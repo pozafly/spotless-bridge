@@ -27,28 +27,25 @@ Gradle을 실행할 **JDK 21 이상**, AI hook에 사용할 **Python 3**도 준�
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // 기존 Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.1.0'
+    id 'io.github.pozafly.spotlessbridge' version '0.1.1'
 }
 ```
 
-Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.0"`을 추가합니다.
+Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.1.1"`을 추가합니다.
 기존 Spotless 버전과 규칙은 그대로 두세요. 다중 프로젝트 빌드에서는 Bridge를 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 그대로 둡니다.
 
 ### 2. hook 스크립트 추가
 
-프로젝트의 Gradle 루트에서 플러그인과 같은 버전의 hook 스크립트와 라이선스를 내려받습니다.
+프로젝트의 Gradle 루트에서 플러그인으로 hook 스크립트와 라이선스를 생성합니다.
 
 ```sh
-bridge_version=0.1.0
-mkdir -p tools/spotless-bridge
-curl -fsSL -o tools/spotless-bridge/ai-hook.py \
-  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/scripts/ai-hook.py"
-curl -fsSL -o tools/spotless-bridge/LICENSE \
-  "https://raw.githubusercontent.com/pozafly/spotless-bridge/v$bridge_version/LICENSE"
+./gradlew spotlessBridgeInstallHook
 ```
 
-두 파일을 프로젝트에 커밋하세요. 플러그인을 업그레이드할 때는 스크립트도 새 버전으로 다시 내려받습니다.
+적용한 플러그인 버전에 맞는 `tools/spotless-bridge/ai-hook.py`와 `LICENSE`가 생성됩니다.
+다른 디렉터리를 쓰려면 `-PspotlessBridgeHookDir=<디렉터리>`를 추가하세요. 두 파일은 프로젝트에 커밋합니다.
+플러그인을 업그레이드한 뒤에는 이 태스크를 다시 실행하세요. 스크립트와 플러그인 버전이 다르면 Bridge가 경고합니다.
 
 ### 3. AI 도구 연결
 
@@ -121,7 +118,7 @@ daemon은 30분 동안 요청이 없으면 종료되고, 다음 요청 때 다�
   빌드에서 configuration cache를 켜 두었다면 Bridge 태스크는 `--no-configuration-cache`로 실행하세요.
 - Bridge는 Spotless 내부 API를 사용하므로, Spotless를 업그레이드하면 Bridge도 함께 업데이트해야 할 수 있습니다.
 
-Bridge 0.1.0은 다음 조합으로 검증했습니다.
+Bridge 0.1.1은 다음 조합으로 검증했습니다.
 
 | JDK | Gradle | Spotless 검증 범위 |
 | --- | --- | --- |

@@ -12,9 +12,13 @@ public final class SharedDaemonSelfTest {
         Path javaHome = Path.of(System.getProperty("java.home"));
         // Use the project-local installation documented in the README.
         Path hookDirectory = root.resolve("tools/spotless-bridge");
-        Files.createDirectories(hookDirectory);
-        Files.copy(Path.of("scripts/ai-hook.py"), hookDirectory.resolve("ai-hook.py"));
-        Files.copy(Path.of("LICENSE"), hookDirectory.resolve("LICENSE"));
+        gradle(root, "spotlessBridgeInstallHook");
+        Path installedHook = hookDirectory.resolve("ai-hook.py");
+        String hookScript = Files.readString(installedHook);
+        check(!hookScript.contains("@spotlessBridgeVersion@") && hookScript.contains("BRIDGE_VERSION = '"),
+                "installed hook script carries the plugin version");
+        check(Files.readString(hookDirectory.resolve("LICENSE")).equals(Files.readString(Path.of("LICENSE"))),
+                "hook installation writes the license");
         // A new CLI initially knows only the root; a cached snapshot also watches this external included build.
         Path included = root.getParent().resolve("included-build");
         Files.createDirectories(included);
@@ -115,6 +119,18 @@ public final class SharedDaemonSelfTest {
         check(Files.readAllLines(counter).size() == calls + 2, "known hook file skips Gradle");
         Files.delete(added);
         System.out.println("PASS: zero-Gradle warm hooks, one-Gradle cold/config refresh");
+
+        // A script from another plugin version still formats, but both entry points tell the user to reinstall it.
+        Files.writeString(installedHook, hookScript.replaceFirst("BRIDGE_VERSION = '[^']*'", "BRIDGE_VERSION = '0.0.0-old'"));
+        Files.writeString(file, source);
+        check(hook(root, file).contains("hook script is 0.0.0-old"), "outdated hook script warns");
+        check(Files.readString(file).equals(expected), "outdated hook script still formats");
+        check(gradle(root, "spotlessBridgeStart").contains("spotlessBridgeInstallHook"), "Gradle start warns about outdated hook");
+        gradle(root, "spotlessBridgeInstallHook");
+        check(Files.readString(installedHook).equals(hookScript), "reinstall restores the packaged hook");
+        check(!hook(root, file).contains("spotlessBridgeInstallHook"), "matching hook script does not warn");
+        check(!gradle(root, "spotlessBridgeStart").contains("spotlessBridgeInstallHook"), "Gradle start accepts matching hook");
+        System.out.println("PASS: hook installation task and version mismatch warnings");
         System.out.println("PASS: hook-only cold start, daemon death, stale endpoint recovery");
 
         // Authentication fails before any format operation and the next valid client still succeeds.
@@ -174,7 +190,7 @@ public final class SharedDaemonSelfTest {
         System.out.println("PASS: authentication, encoding/CRLF parity, concurrent startup, explicit stop, idle exit");
     }
 
-    private static void hook(Path root, Path file) throws Exception {
+    private static String hook(Path root, Path file) throws Exception {
         // Use the shipped hook adapter as an external process, with no editor client alive.
         Path log = Files.createTempFile("shared-daemon-hook-", ".log");
         Process process = new ProcessBuilder(
@@ -190,9 +206,10 @@ public final class SharedDaemonSelfTest {
             throw new AssertionError("Hook timeout: " + log);
         }
         check(process.exitValue() == 0, "Hook failed: " + Files.readString(log));
+        return Files.readString(log);
     }
 
-    private static void gradle(Path root, String... args) throws Exception {
+    private static String gradle(Path root, String... args) throws Exception {
         List<String> command = new ArrayList<>(List.of(
                 Path.of(System.getProperty("java.home"), "bin", "java").toString(),
                 "-cp",
@@ -212,6 +229,7 @@ public final class SharedDaemonSelfTest {
             throw new AssertionError("Gradle timeout: " + log);
         }
         check(process.exitValue() == 0, "Gradle failed: " + log + "\n" + Files.readString(log));
+        return Files.readString(log);
     }
 
     private static void check(boolean condition, String message) {
