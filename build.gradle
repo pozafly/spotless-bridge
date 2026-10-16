@@ -39,13 +39,14 @@ java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaV
 tasks.named('compileJava', JavaCompile) { options.release = 17 }
 tasks.named('compileTestJava', JavaCompile) { options.release = 17 }
 // IDE-only tasks use a pinned SDK; engine/Gradle checks do not require an IDE installation.
-def ideaSdkVersion = providers.gradleProperty('ideaSdkVersion').get()
-def ideaSdkBuild = providers.gradleProperty('ideaSdkBuild').get()
-def ideaHome = providers.gradleProperty('ideaHome').orElse('/Applications/IntelliJ IDEA.app/Contents')
-def ideaJavaHome = providers.provider {
-    def macRuntime = file("${ideaHome.get()}/jbr/Contents/Home")
-    macRuntime.isDirectory() ? macRuntime : file("${ideaHome.get()}/jbr")
-}
+// The first entry is the minimum supported SDK; every entry verifies the same ZIP.
+def ideaTargets = new groovy.json.JsonSlurper().parse(file('gradle/idea-compatibility.json'))
+def ideaSdkVersion = ideaTargets.first().version
+def ideaSdkBuild = ideaTargets.first().build
+def ideaSdkRoot = providers.gradleProperty('ideaSdkRoot').orElse(layout.projectDirectory.dir('.gradle/idea-sdks').asFile.absolutePath)
+def ideaHome = providers.gradleProperty('ideaHome').orElse(ideaSdkRoot.map { "${it}/${ideaSdkVersion}" })
+def ideaCompiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+def ideaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
 def ideaLibraries = files(fileTree("${ideaHome.get()}/lib") { include '*.jar' })
 sourceSets {
     idea {
@@ -78,8 +79,7 @@ tasks.register('verifyIdeaSdk') {
 }
 tasks.named('compileIdeaJava', JavaCompile) {
     dependsOn 'verifyIdeaSdk'
-    options.fork = true
-    options.forkOptions.executable = new File(ideaJavaHome.get(), 'bin/javac').absolutePath
+    javaCompiler = ideaCompiler
     options.release = 21
     options.compilerArgs += ['-proc:none']
 }
@@ -130,8 +130,7 @@ tasks.named('check') { dependsOn 'selfTest' }
 // IDE verification is explicit so the existing engine compatibility matrix remains SDK-independent.
 tasks.named('compileIdeaTestJava', JavaCompile) {
     dependsOn 'verifyIdeaSdk'
-    options.fork = true
-    options.forkOptions.executable = new File(ideaJavaHome.get(), 'bin/javac').absolutePath
+    javaCompiler = ideaCompiler
     options.release = 21
     options.compilerArgs += ['-proc:none']
 }
@@ -140,7 +139,7 @@ tasks.register('ideaTest', Test) {
     description = 'Verify Safe Mode blocks formatting, including an already cached client'
     testClassesDirs = sourceSets.ideaTest.output.classesDirs
     classpath = sourceSets.ideaTest.runtimeClasspath
-    executable = new File(ideaJavaHome.get(), 'bin/java').absolutePath
+    javaLauncher = ideaLauncher
     useJUnit()
     doFirst {
         jvmArgs "-javaagent:${configurations.ideaTestRuntimeClasspath.find { it.name.startsWith('mockito-core-') }}"
@@ -148,28 +147,57 @@ tasks.register('ideaTest', Test) {
 }
 tasks.register('verifyIdeaPlugin', JavaExec) {
     group = 'verification'
-    description = 'Run the pinned Plugin Verifier against the pinned IntelliJ SDK and packaged ZIP'
-    dependsOn 'verifyIdeaSdk', 'ideaTest', 'pluginZip'
+    description = 'Verify one ZIP against the pinned IntelliJ compatibility matrix'
+    def suppliedZip = providers.gradleProperty('ideaPluginZip')
+    // CI downloads the build job's ZIP. Verification never rebuilds that supplied artifact.
+    if (!suppliedZip.isPresent()) dependsOn 'ideaTest', 'pluginZip'
+    def zipFile = suppliedZip.map { file(it) }.orElse(tasks.pluginZip.archiveFile.map { it.asFile })
+    def selectedVersion = providers.gradleProperty('ideaVerifyVersion')
+    def targets = selectedVersion.isPresent() ? ideaTargets.findAll { it.version == selectedVersion.get() } : ideaTargets
+    if (targets.isEmpty()) throw new GradleException("Unknown ideaVerifyVersion: ${selectedVersion.get()}")
     classpath = configurations.pluginVerifier
     mainClass = 'com.jetbrains.pluginverifier.PluginVerifierMain'
-    executable = new File(ideaJavaHome.get(), 'bin/java').absolutePath
+    javaLauncher = ideaLauncher
     maxHeapSize = '2g'
     def reports = layout.buildDirectory.dir('reports/plugin-verifier')
-    args 'check-plugin', tasks.pluginZip.archiveFile.get().asFile.absolutePath, file(ideaHome.get()).absolutePath,
-            '-verification-reports-dir', reports.get().asFile.absolutePath,
-            '-runtime-dir', ideaJavaHome.get().absolutePath
-    doFirst { delete reports }
+    def archiveHash
+    doFirst {
+        def homes = targets.collect { target ->
+            def home = target.version == ideaSdkVersion ? file(ideaHome.get()) : file("${ideaSdkRoot.get()}/${target.version}")
+            def infoFile = new File(home, 'product-info.json')
+            if (!infoFile.isFile()) infoFile = new File(home, 'Resources/product-info.json')
+            if (!infoFile.isFile()) throw new GradleException("Missing IntelliJ ${target.version} SDK in ${home}; see docs/install-from-source.md")
+            def info = new groovy.json.JsonSlurper().parse(infoFile)
+            if (info.version != target.version || info.buildNumber != target.build || info.productCode != 'IU')
+                throw new GradleException("Expected IU ${target.version} (${target.build}); found ${info.productCode} ${info.version} (${info.buildNumber})")
+            home.absolutePath
+        }
+        if (!zipFile.get().isFile()) throw new GradleException("Plugin ZIP not found: ${zipFile.get()}")
+        archiveHash = java.security.MessageDigest.getInstance('SHA-256').digest(zipFile.get().bytes).encodeHex().toString()
+        delete reports
+        reports.get().asFile.mkdirs()
+        logger.lifecycle("Verifying identical ZIP SHA-256: ${archiveHash}")
+        // Each IDE's bundled runtime supplies its own Java 21/25 API during analysis.
+        setArgs(['check-plugin', zipFile.get().absolutePath] + homes +
+                ['-verification-reports-dir', reports.get().asFile.absolutePath])
+    }
     doLast {
-        // Verifier can exit zero with compatibility problems; inspect its documented report files too.
+        new File(reports.get().asFile, 'plugin-sha256.txt').text = "${archiveHash}  ${zipFile.get().name}\n"
+        if (archiveHash != java.security.MessageDigest.getInstance('SHA-256').digest(zipFile.get().bytes).encodeHex().toString())
+            throw new GradleException('Plugin ZIP changed during verification')
+        // Verifier can exit zero with compatibility problems; require a successful verdict for every pinned build.
         def verdicts = fileTree(reports).matching { include '**/verification-verdict.txt' }.files
-        if (verdicts.size() != 1) throw new GradleException("Plugin Verifier did not produce exactly one verdict; see ${reports.get().asFile}")
+        if (verdicts.size() != targets.size()) throw new GradleException("Expected ${targets.size()} Plugin Verifier verdicts; found ${verdicts.size()}")
         def failures = fileTree(reports).matching {
             include '**/compatibility-problems.txt', '**/invalid-plugin.txt', '**/internal-api-usages.txt',
                     '**/non-extendable-api-usages.txt', '**/override-only-usages.txt'
         }.files.findAll { !it.text.trim().isEmpty() }
         if (!failures.isEmpty()) throw new GradleException("Plugin Verifier failed: ${failures*.absolutePath.join(', ')}")
-        def verdict = verdicts.first().text.trim()
-        if (!verdict.startsWith('Compatible')) throw new GradleException("Plugin Verifier did not confirm compatibility: ${verdict}")
-        logger.lifecycle("Plugin Verifier verdict: ${verdict}")
+        targets.each { target ->
+            def matches = verdicts.findAll { it.toPath().startsWith(new File(reports.get().asFile, "IU-${target.build}").toPath()) }
+            if (matches.size() != 1 || !matches.first().text.trim().startsWith('Compatible'))
+                throw new GradleException("Plugin Verifier did not confirm IntelliJ ${target.version} compatibility; see ${reports.get().asFile}")
+            logger.lifecycle("IntelliJ ${target.version} (${target.build}): ${matches.first().text.trim()}")
+        }
     }
 }

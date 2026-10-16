@@ -4,6 +4,7 @@ import com.intellij.ide.trustedProjects.TrustedProjects;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.Disposable;
+// Keep the public ReadAction API available since 2025.3; the Blocking variants require newer IDEs.
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
@@ -46,7 +47,7 @@ public final class ProjectEngine implements Disposable {
         if (existing != null) return existing;
         String home = settings.javaHome;
         if (home.isBlank())
-            home = ReadAction.computeBlocking(() -> {
+            home = ReadAction.compute(() -> {
                 Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
                 return sdk == null ? null : sdk.getHomePath();
             });
