@@ -104,8 +104,13 @@ Gradle·Spotless 버전 정책 검사는 JDK 17·21의 Gradle 8.14.3 조합에�
   설정이 같은 등록 대상 파일의 반복 hook에서 Gradle 호출 0회, 시작·설정 변경 시 1회, 공용 PID/worker, 80개 동시 요청, hook만의 시작, stale endpoint 복구, 잘못된 토큰 거부,
   UTF-16LE·CRLF Gradle byte 일치, 외부 includeBuild를 포함한 설정 갱신, 동시 시작, stop과 idle 종료.
 
-CI는 SDK 없는 `check engineDist`를 실행합니다. 실제 IntelliJ UI 저장 동작·Plugin Verifier·
-Marketplace 승인과 별개입니다. SDK는 `pluginZip`에만 필요합니다.
+엔진 CI 11개 조합은 SDK 없는 `check engineDist`를 실행합니다. 별도 IDE job은
+`verifyIdeaPlugin`으로 고정 SDK 확인, 신뢰 회귀 테스트, ZIP 생성, Plugin Verifier 검사를 실행합니다.
+SDK와 Verifier 버전, Linux SDK SHA-256은 `gradle.properties`에서 관리합니다. SDK 변경 시 해시와
+설치 허용 범위, 검사 결과를 함께 확인하세요. Verifier는 문제를 발견해도 종료 코드 0을 반환할 수 있어
+문제 리포트도 확인하며, 매번 이전 리포트를 지워 잘못된 성공 판정을 막습니다.
+실제 IDE UI 저장 동작과 Marketplace 승인은 별도입니다. IDE 검증 상세는
+[소스 설치 안내](install-from-source.ko.md#게시-없이-intellij-adapter-검증)를 참고하세요.
 
 `verify.yml`은 Ubuntu 조합에 더해 macOS에서 Gradle 8.14.3·JDK 17과 Gradle 9.8.1·JDK 21을 실행합니다. Windows는 아직 CI가 없습니다.
 `spotless-latest.yml`은 매주 월요일 Plugin Portal의 최신 Spotless 버전을 찾아 `-PtestSpotlessVersion`으로 전체 검사를 실행합니다.
@@ -130,7 +135,7 @@ hook 런처(`src/main/resources/spotless-bridge/spotless-bridge`, `.cmd`)는 플
 게시 자격 증명은 Git에 넣지 않고 저장소 secret `GRADLE_PUBLISH_KEY`, `GRADLE_PUBLISH_SECRET`에 둡니다.
 태그를 만들기 전에 `CHANGELOG.md`에 `## [<version>]` 섹션을 추가합니다. `release.yml`은 `v<version>` 태그를 push하면 태그와 `gradle.properties`의 버전이 같은지 확인하고 `check engineDist`를 거쳐
 `publishPlugins`를 실행한 뒤, 해당 CHANGELOG 섹션으로 GitHub Release를 만듭니다(이미 있으면 노트를 갱신).
-IntelliJ ZIP은 IDE SDK가 필요해 CI에서 만들지 않으므로, 필요하면 로컬에서 `pluginZip`으로 만들어 Release에 직접 첨부합니다.
+IntelliJ ZIP은 별도 IDE 검증 job에서 artifact로 보관하며, Marketplace나 GitHub Release에는 자동 게시하지 않습니다.
 Actions에서 수동 실행하면 기본값으로 `publishPlugins --validate-only`만 수행합니다.
 태그를 push하기 전에 수동 실행으로 메타데이터와 자격 증명을 먼저 확인하세요. 두 옵션의 차이는
 [Gradle 공식 배포 문서](https://docs.gradle.org/current/userguide/publishing_gradle_plugins.html)를 참고하세요.
