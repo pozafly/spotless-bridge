@@ -38,42 +38,74 @@ Once the plugin is on the Plugin Portal, remove the local `maven` entry.
 
 ## 2. Build and install the IntelliJ plugin
 
-Build the IDE plugin ZIP from the checkout:
+Build with JDK 21 and the **2025.3 (IU-253.28294.334)** SDK, the minimum supported IDE.
+Pinned versions, exact build numbers and Linux archive SHA-256 hashes are in
+[`gradle/idea-compatibility.json`](../gradle/idea-compatibility.json). The first entry is the build SDK.
+Download `https://download.jetbrains.com/idea/idea-<version>.tar.gz`, verify its hash against that file,
+and extract it with `--strip-components=1` into `<sdk-root>/<version>`.
+The default SDK root is `.gradle/idea-sdks` inside this checkout; SDK archives are not committed.
+The Linux distributions can be used as SDK inputs on macOS too: compilation and tests run on a local
+JDK 21, while Plugin Verifier reads the IDE's classes and bundled runtime without launching the IDE.
 
 ```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew pluginZip
+JAVA_HOME=/path/to/jdk21 ./gradlew ideaTest pluginZip -PideaSdkRoot=/path/to/sdk-root
 ```
 
-The IDE adapter uses IntelliJ IDEA **2026.2.3 (IU-262.10968.63)**, pinned in `gradle.properties`.
-The default SDK location is `/Applications/IntelliJ IDEA.app/Contents`. `verifyIdeaSdk` rejects a different
-product, version, or build before compilation, even if you override the location. Use the complete IDE
-distribution including its JBR: this SDK contains Java 25 classes, so IDE compilation and tests use its
-bundled JBR while Gradle itself runs on JDK 21. Adapter bytecode remains Java 21; the engine remains Java 17.
-If IntelliJ is installed elsewhere on macOS, add `-PideaHome=/path/to/IntelliJ/Contents`.
-The ZIP declares IntelliJ IDEA builds `262.10968.63` through `262.*`; only the pinned SDK has been verified.
-A later 262 build still needs verification before it is added to the tested list.
+Only the 2025.3 SDK is needed to build. `-PideaHome=/path/to/IDE` can override its location
+(use the `Contents` directory for a macOS IDE). `verifyIdeaSdk` rejects any other product, version or build.
+Adapter bytecode is Java 21; the engine remains Java 17.
+The ZIP declares builds `253.28294.334` through `262.*` (2025.3–2026.2).
 
 In IntelliJ, open **Settings → Plugins → gear menu → Install Plugin from Disk…** and select
 `build/distributions/spotless-bridge-0.1.1.zip`. If you installed an earlier development build,
-disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea-preview) in the README.
+disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea-preview).
 
-### Verify the IntelliJ adapter without publishing
+### Verify the same ZIP across IDE versions without publishing
+
+Install all six pinned SDKs under the SDK root, then run:
 
 ```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaHome=/path/to/pinned/IDE
+JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-root
 ```
 
-This runs SDK validation, the Safe Mode regression tests, ZIP packaging and Plugin Verifier **1.410**.
-Reports are under `build/reports/plugin-verifier/` and `build/reports/tests/ideaTest/`.
-Binary compatibility errors, invalid plugins and forbidden API usage fail the task. Warnings remain
-visible in the report; a successful verification is not Marketplace approval or an IDE UI smoke test.
-The CI has a separate Ubuntu IDE job which downloads the pinned SDK and checks its SHA-256. The
-existing 11 engine jobs do not need an SDK. Neither verification task uploads anything.
+This runs the Safe Mode regression tests, builds one ZIP with 2025.3, and checks that ZIP with
+Plugin Verifier **1.410** against the first release and pinned latest patch of each supported series:
 
-Formatting is unavailable in Safe Mode. Trust the project through IntelliJ's own UI before enabling it;
-the plugin never grants trust automatically. The check runs again before using a cached formatter.
-The tests mock the IDE trust response to check request gating; manually test the actual Safe Mode UI,
-Reformat Code, save actions and shared daemon PID in a clean IDE before release.
+| IntelliJ IDEA | Build |
+| --- | --- |
+| 2025.3 | `253.28294.334` |
+| 2025.3.6.1 | `253.33813.55` |
+| 2026.1 | `261.22158.277` |
+| 2026.1.5 | `261.27258.48` |
+| 2026.2 | `262.8665.258` |
+| 2026.2.3 | `262.10968.63` |
+
+On October 16, 2026, the same ZIP passed all six checks above. The 2025.3 builds reported `Compatible`;
+the 2026.1 and 2026.2 builds reported `Compatible` with three deprecated API usages, explained below.
+
+To verify an already built ZIP against one pinned version without compiling it again:
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.1.1.zip \
+  -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
+```
+
+Only that version's SDK is needed for this command. Reports are under `build/reports/plugin-verifier/`;
+`plugin-sha256.txt` records the verified ZIP hash. Missing SDKs, incorrect build numbers, missing verdicts,
+binary compatibility errors and forbidden API usage fail verification. The task also checks that the ZIP
+has not changed during verification. Newer IDEs report deprecated usages of the public `ReadAction.compute/run`
+API; these are retained for 2025.3 compatibility because the `*Blocking` replacements do not exist there.
+Warnings stay visible; no APIs are accessed through reflection to hide compatibility problems.
+
+CI builds the ZIP once, then six verifier jobs download the same artifact and check its SHA-256 before
+and after verification. SDK downloads are also hash-checked. The existing 11 engine jobs remain independent
+of IDE SDKs. The CI does not publish to Marketplace.
+
+Safe Mode blocks formatting, including cached clients. Trust must be granted through IntelliJ's UI.
+The regression tests mock the trust response. Binary verification does not replace testing actual Safe Mode,
+Reformat Code, save actions and shared daemon PID in real IDEs. Intermediate patches and future releases
+have not each been tested; update the pinned matrix when widening the verified list.
 
 ## Development
 
@@ -115,7 +147,7 @@ Java 17-targeted engine on the selected consumer JDK, which covers Gradle, the d
 Ubuntu CI runs four Gradle versions each on JDK 17 and 21, plus JDK 25 with Gradle 9.8.1: the nine combinations
 in the [compatibility table](../README.md#requirements-and-compatibility).
 Google Java Format is pinned to 1.28.0 in JDK 17 fixtures and 1.30.0 in JDK 21/25 fixtures.
-The engine and engine tests compile with `--release 17`; the IntelliJ adapter and its tests use the pinned SDK JBR with `--release 21`.
+The engine and engine tests compile with `--release 17`; the IntelliJ adapter and its tests use JDK 21 with `--release 21`.
 Selecting an external JDK 17 for formatting does not change IntelliJ's own runtime requirements.
 
 The IntelliJ SDK is needed for IDE packaging and verification tasks, but not engine checks. For implementation details, regression checks, and

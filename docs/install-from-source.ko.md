@@ -39,42 +39,72 @@ Plugin Portal에 배포된 뒤에는 로컬 `maven` 항목을 제거하세요.
 
 ## 2. IntelliJ 플러그인 빌드와 설치
 
-소스 디렉터리에서 IDE용 ZIP을 빌드합니다.
+최소 지원 IDE인 **2025.3 (IU-253.28294.334)** SDK와 JDK 21로 빌드합니다.
+고정 버전·정확한 빌드 번호·Linux 배포본 SHA-256은
+[`gradle/idea-compatibility.json`](../gradle/idea-compatibility.json)에 있으며, 첫 항목이 빌드용 SDK입니다.
+`https://download.jetbrains.com/idea/idea-<version>.tar.gz`를 받아 해당 파일의 해시와 대조한 뒤,
+`--strip-components=1`로 `<sdk-root>/<version>`에 압축을 풉니다.
+기본 SDK 루트는 이 저장소의 `.gradle/idea-sdks`이며 SDK 배포본은 커밋하지 않습니다.
+macOS에서도 Linux 배포본을 SDK 입력으로 쓸 수 있습니다. 컴파일·테스트는 로컬 JDK 21에서 실행하고,
+Verifier는 IDE를 실행하지 않고 클래스와 동봉 런타임을 읽습니다.
 
 ```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew pluginZip
+JAVA_HOME=/path/to/jdk21 ./gradlew ideaTest pluginZip -PideaSdkRoot=/path/to/sdk-root
 ```
 
-IntelliJ SDK는 `gradle.properties`에 **2026.2.3 (IU-262.10968.63)**으로 고정합니다.
-기본 경로는 `/Applications/IntelliJ IDEA.app/Contents`입니다. 경로를 바꾸더라도 제품·버전·빌드가
-다르면 `verifyIdeaSdk`가 컴파일 전에 중단합니다. JBR이 포함된 전체 IDE 배포본을 사용하세요.
-이 SDK에는 Java 25 클래스가 있으므로 IDE 컴파일·테스트는 SDK에 포함된 JBR을 사용하고,
-Gradle 자체는 JDK 21로 실행합니다. adapter 바이트코드는 Java 21, 엔진은 Java 17을 유지합니다.
-IntelliJ가 macOS의 다른 경로에 설치되어 있다면 `-PideaHome=/path/to/IntelliJ/Contents`를 추가하세요.
-ZIP의 설치 허용 범위는 `262.10968.63`부터 `262.*`이며, 검증 대상은 고정한 SDK입니다.
-이후 262 빌드까지 검증한 것으로 간주하지 않으며, 지원 검증 목록을 늘릴 때 별도로 확인합니다.
+빌드에는 2025.3 SDK만 필요합니다. `-PideaHome=/path/to/IDE`로 빌드 SDK 위치를 바꿀 수 있으며,
+macOS IDE는 `Contents` 경로를 사용합니다. 제품·버전·빌드가 다르면 `verifyIdeaSdk`가 중단합니다.
+adapter 바이트코드는 Java 21, 엔진은 Java 17입니다.
+ZIP 설치 허용 범위는 `253.28294.334`부터 `262.*`까지로, 2025.3~2026.2를 대상으로 합니다.
 
 IntelliJ의 **Settings → Plugins → 톱니바퀴 → Install Plugin from Disk…**에서
-`build/distributions/spotless-bridge-0.1.1.zip`을 선택합니다. 이전 개발판 플러그인을 쓰고 있었다면
-먼저 비활성화하거나 제거하세요. 이후 설정은 README의 [IntelliJ IDEA 설정](../README.ko.md#intellij-idea-미리보기)을 따릅니다.
+`build/distributions/spotless-bridge-0.1.1.zip`을 선택하세요. 이전 개발판이 있다면 먼저 비활성화하거나 제거합니다.
+이후 [IntelliJ IDEA 설정](../README.ko.md#intellij-idea-미리보기)을 따릅니다.
 
-### 게시 없이 IntelliJ adapter 검증
+### 게시 없이 동일 ZIP으로 여러 IDE 검증
+
+고정한 SDK 여섯 개를 SDK 루트에 준비하고 실행합니다.
 
 ```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaHome=/path/to/pinned/IDE
+JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-root
 ```
 
-SDK 확인, Safe Mode 회귀 테스트, ZIP 생성, Plugin Verifier **1.410** 검사를 실행합니다.
-리포트는 `build/reports/plugin-verifier/`와 `build/reports/tests/ideaTest/`에 있습니다.
-바이너리 호환성 오류·잘못된 플러그인·금지된 API 사용은 태스크를 실패시킵니다. 경고는 리포트에
-그대로 남으며, 검증 성공은 Marketplace 승인이나 실제 IDE UI 동작 검증을 의미하지 않습니다.
-CI의 별도 Ubuntu IDE job은 고정 SDK를 내려받아 SHA-256을 확인합니다. 기존 엔진 11개 job에는
-SDK가 필요하지 않으며 이 검증 명령은 어떤 게시도 수행하지 않습니다.
+신뢰 회귀 테스트 후 2025.3으로 ZIP을 한 번 만들고, Plugin Verifier **1.410**으로 같은 ZIP을 검사합니다.
+각 지원 계열의 첫 버전과 고정한 최신 패치가 대상입니다.
 
-Safe Mode에서는 포맷을 실행하지 않습니다. IntelliJ UI에서 프로젝트를 직접 신뢰한 뒤 사용하세요.
-플러그인은 신뢰를 자동으로 부여하지 않으며, 캐시된 포매터 사용 전에도 신뢰를 다시 확인합니다.
-자동 테스트는 IDE의 신뢰 응답을 모킹해 요청 차단을 확인합니다. 실제 Safe Mode UI, Reformat Code,
-저장 동작과 공용 daemon PID는 출시 전 깨끗한 IDE에서 별도로 확인하세요.
+| IntelliJ IDEA | Build |
+| --- | --- |
+| 2025.3 | `253.28294.334` |
+| 2025.3.6.1 | `253.33813.55` |
+| 2026.1 | `261.22158.277` |
+| 2026.1.5 | `261.27258.48` |
+| 2026.2 | `262.8665.258` |
+| 2026.2.3 | `262.10968.63` |
+
+2026년 10월 16일, 동일 ZIP으로 위 여섯 검사를 통과했습니다. 2025.3 계열은 `Compatible`,
+2026.1·2026.2 계열은 deprecated API 사용 3건을 포함한 `Compatible` 판정입니다. 경고의 이유는 아래에 설명합니다.
+
+이미 만든 ZIP을 재빌드 없이 특정 버전에서만 검증하려면 다음처럼 실행합니다.
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.1.1.zip \
+  -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
+```
+
+이 명령에는 해당 버전 SDK만 필요합니다. 보고서는 `build/reports/plugin-verifier/`에 있으며
+`plugin-sha256.txt`에 검사한 ZIP 해시를 남깁니다. SDK 누락·빌드 불일치·판정 누락·바이너리 호환성 오류·
+금지된 API 사용은 실패 처리합니다. 검사 중 ZIP 내용이 바뀌어도 실패합니다.
+새 IDE에서는 공개 API인 `ReadAction.compute/run`의 deprecated 경고가 나옵니다. 대체 `*Blocking` API가
+2025.3에는 없어 호환성을 위해 기존 API를 유지하며, 경고를 숨기거나 리플렉션으로 우회하지 않습니다.
+
+CI는 ZIP을 한 번 빌드하고 여섯 Verifier job이 같은 artifact를 받아 검사 전후 SHA-256을 확인합니다.
+SDK 다운로드 해시도 확인합니다. 기존 엔진 11개 job은 SDK 없이 실행하며 Marketplace에 자동 게시하지 않습니다.
+
+Safe Mode에서는 캐시된 연결을 포함한 포맷 요청을 차단합니다. 신뢰는 사용자가 IntelliJ UI에서 부여해야 합니다.
+회귀 테스트는 신뢰 응답을 모킹합니다. 바이너리 검증은 실제 IDE의 Safe Mode·Reformat Code·저장 동작·
+공용 daemon PID 확인을 대신하지 않습니다. 중간 패치와 미래 버전 각각을 모두 시험한 것은 아니며,
+검증 목록을 늘릴 때 고정 매트릭스를 갱신하세요.
 
 ## 개발
 
@@ -116,7 +146,7 @@ Bridge 자체는 JDK 21과 저장소에 포함된 Gradle 8.14.3 wrapper로 빌�
 Ubuntu CI는 JDK 17·21에서 각각 네 Gradle 버전을, JDK 25에서 Gradle 9.8.1을 검사합니다.
 [호환 조합 표](../README.ko.md#요구-사항과-호환성)의 아홉 조합 전체입니다.
 Google Java Format 테스트 버전은 JDK 17에서 1.28.0, JDK 21·25에서 1.30.0으로 고정합니다.
-엔진과 엔진 테스트는 `--release 17`로 컴파일하며, IntelliJ adapter와 해당 테스트는 고정 SDK의 JBR에서 `--release 21`로 컴파일합니다.
+엔진과 엔진 테스트는 `--release 17`로 컴파일하며, IntelliJ adapter와 해당 테스트는 JDK 21에서 `--release 21`로 컴파일합니다.
 포맷용 외부 JDK 17을 선택하는 것과 IntelliJ 자체 실행 JDK의 요구사항은 별개입니다.
 
 IntelliJ SDK는 IDE 패키징·검증 태스크에 필요하며, 엔진 검사에는 필요하지 않습니다. 구현 상세, 회귀 검사, 게시 절차는 [유지보수 문서](maintenance.md)를 참고하세요.

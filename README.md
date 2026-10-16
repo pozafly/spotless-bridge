@@ -161,6 +161,11 @@ It uses the same daemon as your AI hook. It is not on JetBrains Marketplace yet;
 [build and install it from source](docs/install-from-source.md#2-build-and-install-the-intellij-plugin).
 AI hooks and Gradle tasks work without it.
 
+IDE compatibility targets **2025.3–2026.2**. One ZIP is built against 2025.3 and checked with Plugin Verifier
+against six pinned builds (the first release and latest pinned patch of each series). See the
+[exact versions and verification limits](docs/install-from-source.md#verify-the-same-zip-across-ide-versions-without-publishing).
+Safe Mode blocks formatting until you trust the project in IntelliJ.
+
 After installing it:
 
 1. Open **Settings → Tools → Spotless Bridge** and enable the plugin.
