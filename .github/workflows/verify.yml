@@ -8,18 +8,34 @@ permissions:
   contents: read
 jobs:
   gradle-and-worker:
+    name: Consumer Gradle ${{ matrix.gradle }} / JDK ${{ matrix.java }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        gradle: ["8.14.3", "8.14.6", "9.0.0", "9.8.1"]
+        java: ["21"]
+        include:
+          - gradle: "9.8.1"
+            java: "25"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v4
+      - name: Set up consumer JDK
+        id: consumer-java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ matrix.java }}
+      - name: Set up build JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Verify DSL, formatter output and persistent worker
         run: ./gradlew --no-daemon --console=plain check engineDist
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
-          name: spotless-bridge-engine
+          name: spotless-bridge-engine-gradle-${{ matrix.gradle }}-jdk-${{ matrix.java }}
           path: build/engine/
           if-no-files-found: error
