@@ -162,6 +162,11 @@ AI hook과 같은 daemon을 사용합니다. 아직 JetBrains Marketplace에 없
 [소스에서 빌드해 설치](docs/install-from-source.ko.md#2-intellij-플러그인-빌드와-설치)하세요.
 AI hook과 Gradle 태스크는 IntelliJ 플러그인 없이도 사용할 수 있습니다.
 
+IDE 호환 대상은 **2025.3~2026.2**입니다. 2025.3으로 ZIP 하나를 빌드하고, 각 계열의 첫 버전·고정한
+최신 패치 총 여섯 빌드에서 Plugin Verifier로 검사합니다.
+[정확한 버전과 검증 범위](docs/install-from-source.ko.md#게시-없이-동일-zip으로-여러-ide-검증)를 참고하세요.
+Safe Mode에서는 IntelliJ에서 프로젝트를 신뢰하기 전까지 포맷을 실행하지 않습니다.
+
 설치한 뒤에는 다음과 같이 설정합니다.
 
 1. **Settings → Tools → Spotless Bridge**에서 플러그인을 켭니다.
