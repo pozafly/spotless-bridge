@@ -78,7 +78,14 @@ To run the same suite against a different consumer Gradle version (the default i
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist -PtestGradleVersion=9.8.1
 ```
 
-To compile with JDK 21 but run the full compatibility suite on JDK 25:
+To compile with JDK 21 and run the full compatibility suite on JDK 17:
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
+  -PtestGradleVersion=8.14.3 -PtestJavaHome=/path/to/jdk17
+```
+
+For JDK 25, use Gradle 9.8.1:
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
@@ -89,9 +96,13 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
 but it doesn't change your system default Java or the engine's minimum runtime version.
 
 Bridge itself is built with JDK 21 and the checked-in Gradle 8.14.3 wrapper. Tests run the same
-Java 21-targeted engine on the selected consumer JDK, which covers Gradle, the daemon, workers, and hooks.
-Ubuntu CI runs the four JDK 21 combinations from the [compatibility table](../README.md#requirements-and-compatibility)
-plus JDK 25 with Gradle 9.8.1. The JDK 25 combination was also verified locally on macOS with Temurin 25.0.4.1.
+Java 17-targeted engine on the selected consumer JDK, which covers Gradle, the daemon, workers, and hooks.
+Ubuntu CI is configured for four Gradle versions each on JDK 17 and 21, plus JDK 25 with Gradle 9.8.1: nine combinations
+from the [compatibility table](../README.md#requirements-and-compatibility). All nine were checked locally on macOS
+(Zulu 17.0.20.1, Corretto 21.0.6, and Temurin 25.0.4.1); GitHub CI still needs to run for these changes.
+Google Java Format is pinned to 1.28.0 in JDK 17 fixtures and 1.30.0 in JDK 21/25 fixtures.
+The engine and tests compile with `--release 17`; the IntelliJ adapter keeps `--release 21` for its IDE SDK.
+Selecting an external JDK 17 for formatting does not change IntelliJ's own runtime requirements.
 
 The IntelliJ SDK is needed only for `pluginZip`. For implementation details, regression checks, and
 publishing instructions, see the [maintainer notes (Korean)](maintenance.md).

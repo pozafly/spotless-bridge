@@ -18,7 +18,7 @@ There is no separate editor style to maintain and no global service to install.
 ## Quick start
 
 You need a Gradle project with Spotless Java formatting configured, its Gradle wrapper,
-**JDK 21 or newer** to run Gradle, and **Python 3** for the AI hook.
+**JDK 17 or newer** to run Gradle, and **Python 3** for the AI hook.
 
 ### 1. Apply the plugin
 
@@ -112,17 +112,25 @@ The daemon shuts down after 30 minutes without requests and starts again on the 
 
 ## Requirements and compatibility
 
-- Gradle must run on **JDK 21 or newer**: the JDK in `JAVA_HOME` when you call `./gradlew` or the hook.
+- Gradle must run on **JDK 17 or newer**: the JDK in `JAVA_HOME` when you call `./gradlew` or the hook.
+- Formatter libraries can require a newer JDK than Bridge. The tests use Google Java Format **1.28.0 on JDK 17**
+  and **1.30.0 on JDK 21/25**; 1.30.0 requires JDK 21+. Bridge preserves the project's chosen version and reports
+  incompatibility instead of silently downgrading it. Palantir 2.97.0/2.96.0 and the fixture's Eclipse configuration are also tested.
 - Bridge formats **whole Java files in Gradle projects**. Maven support is in progress; other languages are not supported.
 - Not supported: Gradle configuration cache, isolated projects, Spotless `ratchetFrom`, and non-serializable formatting steps.
   Run Bridge tasks with `--no-configuration-cache` if your build enables the configuration cache.
 - Bridge relies on Spotless internal APIs, so a Spotless upgrade may need a matching Bridge update.
 
-Bridge 0.1.1 is tested with these combinations:
+The current 0.1.1 source is tested with these combinations. JDK 17 support is not included in the existing `v0.1.0` release,
+which still requires JDK 21; use the [source installation guide](docs/install-from-source.md) until the updated version is published:
 
 | JDK | Gradle | Spotless verification |
 | --- | --- | --- |
-| 21 | 8.14.3 | 8.10.2 full regression suite; 8.0.0 version-switch and output-parity check |
+| 17 | 8.14.3 | 8.10.2 full regression suite; 8.0.0 version-switch and output-parity check |
+| 17 | 8.14.6 | Same checks |
+| 17 | 9.0.0 | Same checks |
+| 17 | 9.8.1 | Same checks |
+| 21 | 8.14.3 | Same checks |
 | 21 | 8.14.6 | Same checks |
 | 21 | 9.0.0 | Same checks |
 | 21 | 9.8.1 | Same checks |
@@ -131,7 +139,8 @@ Bridge 0.1.1 is tested with these combinations:
 Other versions may work, but these are the only combinations tested. JDK 25 has not been tested with
 Gradle 8.x or 9.0.0. The suite covers Groovy and Kotlin DSL, output parity with plain Spotless,
 new and excluded files, configuration refresh, shared daemon reuse, concurrent requests, and hooks
-running without an IDE.
+running without an IDE. All nine combinations were checked locally on macOS; the Ubuntu CI matrix is configured
+for the same combinations. GitHub CI must be rerun after these changes are pushed.
 
 ## More on the AI hook
 
@@ -174,7 +183,7 @@ AI hooks work without the IntelliJ plugin.
 
 After installing it:
 
-1. Open **Settings → Tools → Spotless Bridge**, enable the plugin, and set the JDK 21 path.
+1. Open **Settings → Tools → Spotless Bridge**, enable the plugin, and set a JDK 17 or newer path that also meets your formatter's requirements. Use the same JDK as the hook.
 2. If needed, set the Gradle root. Use the same root as your AI hook.
 3. Run **Reformat Code** on a Java source file to format it with your Spotless rules.
 4. To format on save, enable **Tools → Actions on Save → Reformat code** with **Java / Whole file**.
