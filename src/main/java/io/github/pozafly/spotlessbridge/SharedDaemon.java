@@ -331,23 +331,40 @@ public final class SharedDaemon {
     }
 
     /**
+     * Counts from one {@link #apply} run.
+     *
+     * @param formatted listed files that are Spotless targets and were formatted
+     * @param changed formatted files whose contents changed on disk
+     * @param skipped listed files that are not Spotless targets and were left unchanged
+     */
+    public record ApplyResult(int formatted, int changed, int skipped) {}
+
+    /**
      * Formats listed files on disk using an already installed daemon snapshot.
-     * Each changed file is written after checking its original contents and tracked configuration;
-     * files written before a later failure are not rolled back. Non-target files are skipped.
+     * All files are formatted first; tracked configuration is then checked once, and each changed file is
+     * written after checking its original contents. Files written before a later failure are not rolled back.
+     * Non-target files are skipped.
      *
      * @param root Gradle root directory
      * @param list UTF-8 file with one absolute or root-relative source path per line
+     * @return how many listed files were formatted, changed, and skipped
      * @throws Exception if file access, formatting, encoding, or concurrent-change validation fails
      */
-    public static void apply(Path root, Path list) throws Exception {
+    public static ApplyResult apply(Path root, Path list) throws Exception {
         Properties endpoint = endpoint(root);
         Properties metadata = metadata(endpoint);
         String fingerprint = metadata.getProperty("fingerprint");
+        Map<Path, byte[][]> results = new LinkedHashMap<>();
+        int skipped = 0;
         for (String line : Files.readAllLines(list, StandardCharsets.UTF_8)) {
             if (line.isBlank()) continue;
             Path file = root.resolve(line).toRealPath();
             String ids = metadata.getProperty("target." + file);
-            if (ids == null) continue;
+            if (ids == null) {
+                skipped++;
+                continue;
+            }
+            if (results.containsKey(file)) continue;
             Charset encoding = Charset.forName(metadata.getProperty("encoding." + ids.split(",")[0]));
             for (String id : ids.split(",")) {
                 if (!encoding.equals(Charset.forName(metadata.getProperty("encoding." + id))))
@@ -360,12 +377,23 @@ public final class SharedDaemon {
             ByteBuffer encoded = encoding.newEncoder().encode(java.nio.CharBuffer.wrap(formatted));
             byte[] result = new byte[encoded.remaining()];
             encoded.get(result);
-            if (!fingerprint.equals(GradleFormatter.fingerprint(root.toRealPath(), watchedRoots(metadata), List.of())))
-                throw new IOException("Build settings changed during formatting; retry");
-            if (!Arrays.equals(original, Files.readAllBytes(file)))
-                throw new IOException("Source changed during formatting: " + file);
-            if (!Arrays.equals(original, result)) Files.write(file, result);
+            results.put(file, new byte[][] {original, result});
         }
+        // Hashing the tracked configuration walks the build; once per run keeps whole-project formatting fast.
+        if (!results.isEmpty()
+                && !fingerprint.equals(GradleFormatter.fingerprint(root.toRealPath(), watchedRoots(metadata), List.of())))
+            throw new IOException("Build settings changed during formatting; retry");
+        int changed = 0;
+        for (Map.Entry<Path, byte[][]> entry : results.entrySet()) {
+            byte[] original = entry.getValue()[0], result = entry.getValue()[1];
+            if (!Arrays.equals(original, Files.readAllBytes(entry.getKey())))
+                throw new IOException("Source changed during formatting: " + entry.getKey());
+            if (!Arrays.equals(original, result)) {
+                Files.write(entry.getKey(), result);
+                changed++;
+            }
+        }
+        return new ApplyResult(results.size(), changed, skipped);
     }
 
     /**

@@ -15,7 +15,9 @@ First release published to the Gradle Plugin Portal.
 - Hook errors are reported in one line, such as `Spotless Bridge: file not found: <path>`, with exit code 1.
 - Gradle and Spotless version checks: Gradle 8.14.3 or newer and below 10.0, and Spotless 8.x, are accepted.
   Versions outside the verified list warn; versions outside the range stop with the detected version and the accepted range.
-- Descriptions for `spotlessBridgeStatus` and `spotlessBridgeStop`.
+- `spotlessBridgeApply` without arguments formats every Spotless Java target, matching `spotlessApply`.
+  `-PspotlessBridgeFiles` also accepts comma-separated paths, and the task reports how many files changed.
+- Bridge tasks are grouped as `spotlessBridge` in `./gradlew tasks`, with a description for each task.
 
 ### Changed
 

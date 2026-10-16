@@ -36,6 +36,14 @@ In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.1.1"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
+To format every Spotless Java target right away, run:
+
+```sh
+./gradlew spotlessBridgeApply
+```
+
+The daemon starts automatically on the first run; there is no separate start step.
+
 ### 2. Connect your AI tool
 
 The plugin keeps a small launcher in `.gradle/spotless-bridge/` and updates it on every Gradle run, such as a build
@@ -171,23 +179,19 @@ and two of them on macOS.
 After formatting, keep running your project's usual checks: `spotlessCheck`, compilation, and relevant tests.
 If you use OpenRewrite, run it before Bridge so the rewritten code gets formatted.
 
-### Use a Gradle task instead
+### Gradle tasks
 
-If your scripts already run Gradle, you can call the apply task directly. Create a UTF-8 file with
-one target path per line, absolute or relative to the Gradle root:
+The tasks are listed under **SpotlessBridge tasks** in `./gradlew tasks`.
 
-```text
-src/main/java/example/Customer.java
-src/test/java/example/CustomerTest.java
-```
+| Command | What it does |
+| --- | --- |
+| `./gradlew spotlessBridgeApply` | Formats every Spotless Java target, with the same result as `spotlessApply` |
+| `./gradlew spotlessBridgeApply -PspotlessBridgeFiles=src/main/java/A.java,src/main/java/B.java` | Formats only the listed files; files that are not Spotless targets are skipped |
+| `./gradlew spotlessBridgeApply -PspotlessBridgeFiles=changed-files.txt` | Formats the files listed one per line in a UTF-8 file |
+| `./gradlew spotlessBridgeStatus` / `spotlessBridgeStop` | Shows or stops the project daemon |
 
-Then pass that file to the apply task:
-
-```sh
-./gradlew --no-configuration-cache spotlessBridgeApply -PspotlessBridgeFiles=/path/to/changed-files.txt
-```
-
-This approach evaluates Gradle on every run, so prefer the launcher for frequent hooks.
+Paths are absolute or relative to the Gradle root. Each task starts or refreshes the daemon when needed.
+These tasks still evaluate Gradle on every run, so prefer the launcher for frequent AI hooks.
 
 ## IntelliJ IDEA (preview)
 
