@@ -1,0 +1,45 @@
+name: Native CLI build and integration
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  native:
+    name: Native CLI / ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15-intel, platform: macos-x64, target: x86_64-apple-darwin }
+          - { os: macos-14, platform: macos-arm64, target: aarch64-apple-darwin }
+          - { os: ubuntu-22.04, platform: linux-x64, target: x86_64-unknown-linux-musl }
+          - { os: ubuntu-22.04-arm, platform: linux-arm64, target: aarch64-unknown-linux-musl }
+          - { os: windows-2022, platform: windows-x64, target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, platform: windows-arm64, target: aarch64-pc-windows-msvc }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+          targets: ${{ matrix.target }}
+      # The musl targets carry their own libc. Use the host linker; musl-gcc's
+      # wrapper can produce a crashing static PIE on x64 (rust-lang/rust#95926).
+      - name: Statically link the Windows C runtime
+        if: runner.os == 'Windows'
+        run: echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"
+      - name: Build and test native client and Gradle installation
+        run: ./gradlew --no-daemon --console=plain testNativeCli nativeSmokeTest -PnativeTarget=${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: build/native/
+          if-no-files-found: error

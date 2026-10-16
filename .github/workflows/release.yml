@@ -17,11 +17,20 @@ concurrency:
   group: release
   cancel-in-progress: false
 jobs:
+  native-clients:
+    uses: ./.github/workflows/native.yml
   publish:
+    needs: native-clients
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: build/native
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -48,7 +57,7 @@ jobs:
             exit 1
           fi
       - name: Verify
-        run: ./gradlew --no-daemon --console=plain check engineDist
+        run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native check engineDist
       - name: Publish
         env:
           GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
@@ -60,9 +69,9 @@ jobs:
             exit 1
           fi
           if [ "$PUBLISH" = "true" ]; then
-            ./gradlew --no-daemon --console=plain publishPlugins
+            ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native publishPlugins
           else
-            ./gradlew --no-daemon --console=plain publishPlugins --validate-only
+            ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native publishPlugins --validate-only
           fi
       - name: Create GitHub Release
         if: github.event_name == 'push'
