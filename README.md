@@ -173,21 +173,37 @@ Restart the IDE if prompted. You can also
 It supports IntelliJ IDEA **2025.3–2026.2**; see the
 [verified versions](docs/install-from-source.md#verify-the-same-zip-across-ide-versions-without-publishing).
 
-After installing it:
+**The IDE plugin requires project setup too.** Your project needs its Gradle wrapper,
+Gradle **8.14.3 or newer (below 10.0)**, Spotless **8.x** with Java formatting configured, and the
+`io.github.pozafly.spotlessbridge` Gradle plugin **0.2.2** applied at the root.
+Follow [Quick start, step 1](#1-apply-the-plugin) for Groovy and Kotlin DSL, then sync Gradle.
+Keep each module's existing Spotless configuration. You do not need to configure an AI hook to use the IDE plugin.
+
+After installing the IDE plugin and preparing the project:
 
 1. Open **Settings → Tools → Spotless Bridge** and enable the plugin.
-   Set a JDK 17 or newer that also meets your formatter's requirements; use the same JDK as the hook.
-2. If needed, set the Gradle root. Use the same root as your AI hook.
+   Set a JDK 17 or newer that also meets your Gradle and formatter requirements, or leave the field empty
+   to use the project SDK. If you use an AI hook, use the same JDK.
+2. Leave **Gradle root** empty to find the nearest wrapper from each Java file, or set it explicitly.
+   If you use an AI hook, use the same root.
 3. Run **Reformat Code** on a Java source file to format it with your Spotless rules.
-4. To format on save, enable **Tools → Actions on Save → Reformat code** with **Java / Whole file**.
+   The first request runs Gradle to load the rules and start the daemon.
+4. To format on save, enable **Settings → Tools → Actions on Save → Reformat code** with **Java / Whole file**.
    Turn off other Java formatters and the Optimize imports, Rearrange code, and Code cleanup
    save actions so they don't change the result afterward.
 
 Notes:
 
-- The plugin formats writable local Java files that IntelliJ recognizes as source.
+- The plugin formats writable local Java files that IntelliJ recognizes as source and that are included in your Spotless targets.
   Formatting only a selection isn't supported.
 - In Safe Mode, formatting stays disabled until you trust the project.
+- Saved build configuration reloads on the next format request. For external configuration files, add their paths to
+  **Extra watched paths**, one per line relative to the Gradle root. Use **Reload Spotless configuration on next format**
+  in the plugin settings to request a reload manually.
+
+For help, see [Troubleshooting](#troubleshooting) or [report an issue](https://github.com/pozafly/spotless-bridge/issues).
+Include the IDE and Bridge versions, Gradle/JDK/Spotless versions, reproduction steps, and the error message.
+The [source code](https://github.com/pozafly/spotless-bridge) and [changelog](CHANGELOG.md) are available on GitHub.
 
 ## How it works
 

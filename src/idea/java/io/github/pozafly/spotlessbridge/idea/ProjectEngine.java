@@ -4,12 +4,12 @@ import com.intellij.ide.trustedProjects.TrustedProjects;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.Disposable;
-// Keep the public ReadAction API available since 2025.3; the Blocking variants require newer IDEs.
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.util.Computable;
 import io.github.pozafly.spotlessbridge.GradleFormatter;
 import java.io.IOException;
 import java.nio.file.*;
@@ -47,7 +47,8 @@ public final class ProjectEngine implements Disposable {
         if (existing != null) return existing;
         String home = settings.javaHome;
         if (home.isBlank())
-            home = ReadAction.compute(() -> {
+            // Keep blocking read semantics on 2025.3, which lacks ReadAction.computeBlocking.
+            home = ApplicationManager.getApplication().runReadAction((Computable<String>) () -> {
                 Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
                 return sdk == null ? null : sdk.getHomePath();
             });

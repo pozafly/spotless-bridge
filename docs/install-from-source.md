@@ -2,8 +2,9 @@
 
 English | [한국어](install-from-source.ko.md)
 
-This guide is for trying Spotless Bridge before it is published to the Gradle Plugin Portal and
-JetBrains Marketplace, or for working on Bridge itself. For everyday usage, see the [README](../README.md).
+This guide is for building the IntelliJ plugin from source or working on Bridge itself.
+The Gradle plugin 0.2.2 is available on the Gradle Plugin Portal; IDE users can use that release without
+publishing to a local repository in step 1. For everyday usage, see the [README](../README.md).
 
 You need a Spotless Bridge source checkout and **JDK 21**. The examples use these placeholder paths:
 
@@ -54,6 +55,9 @@ Once the plugin is on the Plugin Portal, remove the local `maven` entry.
 
 ## 2. Build and install the IntelliJ plugin
 
+In `gradle.properties`, `version=0.2.2` controls the Gradle plugin, native client and IntelliJ plugin versions.
+The release workflow uses this shared version to locate the verified IntelliJ ZIP.
+
 Build with JDK 21 and the **2025.3 (IU-253.28294.334)** SDK, the minimum supported IDE.
 Pinned versions, exact build numbers and Linux archive SHA-256 hashes are in
 [`gradle/idea-compatibility.json`](../gradle/idea-compatibility.json). The first entry is the build SDK.
@@ -84,7 +88,7 @@ Install all six pinned SDKs under the SDK root, then run:
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-root
 ```
 
-This runs the Safe Mode regression tests, builds one ZIP with 2025.3, and checks that ZIP with
+This runs the Safe Mode and formatting-result guard regression tests, builds one ZIP with 2025.3, and checks that ZIP with
 Plugin Verifier **1.410** against the first release and pinned latest patch of each supported series:
 
 | IntelliJ IDEA | Build           |
@@ -96,8 +100,11 @@ Plugin Verifier **1.410** against the first release and pinned latest patch of e
 | 2026.2        | `262.8665.258`  |
 | 2026.2.3      | `262.10968.63`  |
 
-On October 16, 2026, the 0.1.1 ZIP passed all six checks above. The 2025.3 builds reported `Compatible`;
-the 2026.1 and 2026.2 builds reported `Compatible` with three deprecated API usages, explained below.
+On October 17, 2026, a local pre-release build labeled 0.2.2 passed all six checks above with `Compatible` verdicts and
+zero deprecated API usages. All six Safe Mode and formatting-result guard tests passed.
+The verified ZIP SHA-256 is `56a99636df9a18e13357e70714be0ee19c2ee4dcf036290c5dae202a69b4520c`.
+That historical build predates the published 0.2.2 release and the current integration; its hash and results
+do not describe the current ZIP. It was not uploaded or manually tested in each IDE. Re-run verification for the current build.
 
 To verify an already built ZIP against one pinned version without compiling it again:
 
@@ -109,10 +116,9 @@ JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
 
 Only that version's SDK is needed for this command. Reports are under `build/reports/plugin-verifier/`;
 `plugin-sha256.txt` records the verified ZIP hash. Missing SDKs, incorrect build numbers, missing verdicts,
-binary compatibility errors and forbidden API usage fail verification. The task also checks that the ZIP
-has not changed during verification. Newer IDEs report deprecated usages of the public `ReadAction.compute/run`
-API; these are retained for 2025.3 compatibility because the `*Blocking` replacements do not exist there.
-Warnings stay visible; no APIs are accessed through reflection to hide compatibility problems.
+binary compatibility errors, forbidden API usage and deprecated API usage fail verification. The task also
+checks that the ZIP has not changed during verification. The public `Application.runReadAction` API preserves
+existing read locking and 2025.3 compatibility.
 
 CI builds the ZIP once, then six verifier jobs download the same artifact and check its SHA-256 before
 and after verification. SDK downloads are also hash-checked. The existing 11 engine jobs remain independent

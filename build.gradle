@@ -243,7 +243,7 @@ tasks.named('compileIdeaTestJava', JavaCompile) {
 }
 tasks.register('ideaTest', Test) {
     group = 'verification'
-    description = 'Verify Safe Mode blocks formatting, including an already cached client'
+    description = 'Verify IDE formatting guards and Safe Mode protection'
     testClassesDirs = sourceSets.ideaTest.output.classesDirs
     classpath = sourceSets.ideaTest.runtimeClasspath
     javaLauncher = ideaLauncher
@@ -296,7 +296,7 @@ tasks.register('verifyIdeaPlugin', JavaExec) {
         def verdicts = fileTree(reports).matching { include '**/verification-verdict.txt' }.files
         if (verdicts.size() != targets.size()) throw new GradleException("Expected ${targets.size()} Plugin Verifier verdicts; found ${verdicts.size()}")
         def failures = fileTree(reports).matching {
-            include '**/compatibility-problems.txt', '**/invalid-plugin.txt', '**/internal-api-usages.txt',
+            include '**/compatibility-problems.txt', '**/invalid-plugin.txt', '**/internal-api-usages.txt', '**/deprecated-usages.txt',
                     '**/non-extendable-api-usages.txt', '**/override-only-usages.txt'
         }.files.findAll { !it.text.trim().isEmpty() }
         if (!failures.isEmpty()) throw new GradleException("Plugin Verifier failed: ${failures*.absolutePath.join(', ')}")

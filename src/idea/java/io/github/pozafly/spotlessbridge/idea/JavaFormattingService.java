@@ -2,12 +2,12 @@ package io.github.pozafly.spotlessbridge.idea;
 
 import com.intellij.formatting.service.*;
 import com.intellij.ide.trustedProjects.TrustedProjects;
-// Keep the public ReadAction API available since 2025.3; the Blocking variants require newer IDEs.
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
@@ -55,7 +55,8 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
         // Import rewrites require a whole-file, non-whitespace-only formatting request.
         if (request.canChangeWhitespaceOnly() || request.isQuickFormat()) return null;
         Project project = request.getContext().getProject();
-        Document document = ReadAction.compute(() -> PsiDocumentManager.getInstance(project)
+        // Application.runReadAction preserves blocking reads on the minimum 2025.3 SDK.
+        Document document = ApplicationManager.getApplication().runReadAction((Computable<Document>) () -> PsiDocumentManager.getInstance(project)
                 .getDocument(request.getContext().getContainingFile()));
         if (document == null) return null;
         long stamp = document.getModificationStamp();
@@ -71,7 +72,7 @@ public final class JavaFormattingService extends AsyncDocumentFormattingService 
                 }
                 try {
                     String formatted = project.getService(ProjectEngine.class).format(sourceFile, source);
-                    ReadAction.run(() -> {
+                    ApplicationManager.getApplication().runReadAction(() -> {
                         boolean current = !cancelled.get()
                                 && !project.isDisposed()
                                 && project.getService(FormatterSettings.class).getState().enabled

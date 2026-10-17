@@ -2,6 +2,17 @@
 
 All notable changes to Spotless Bridge are documented here.
 
+## [Unreleased]
+
+### IntelliJ IDEA plugin
+
+- Replace three deprecated read-action API usages with the public `Application.runReadAction` API,
+  preserving synchronous read locking and IntelliJ IDEA 2025.3–2026.2 compatibility.
+- Reject deprecated API usages in the IntelliJ compatibility verification task.
+- Add regression coverage for read locking and discarding formatting results after document changes,
+  cancellation or disabling the plugin.
+- Expand the English and Korean setup instructions and IDE change notes.
+
 ## [0.2.2] - 2026-10-22
 
 ### Gradle plugin and publishing
@@ -77,6 +88,7 @@ The launcher appears after the next Gradle run, and its first call prepares the 
 Initial GitHub release with the Gradle plugin, the IntelliJ adapter, and a Python AI hook script.
 It was not published to the Gradle Plugin Portal.
 
+[Unreleased]: https://github.com/pozafly/spotless-bridge/compare/v0.2.2...HEAD
 [0.2.2]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.2
 [0.2.1]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.0

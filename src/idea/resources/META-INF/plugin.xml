@@ -71,18 +71,19 @@
         <a href="https://github.com/pozafly/spotless-bridge">소스 코드</a></p>
     ]]></description>
     <change-notes><![CDATA[
-        <p><b>IntelliJ plugin ${version}</b></p>
+        <p><b>IntelliJ plugin ${version}</b> — compatibility maintenance.</p>
         <ul>
-            <li>Add the Spotless Bridge plugin icon.</li>
-            <li>Update setup guide links for the Marketplace installation instructions.</li>
+            <li>Remove three deprecated IntelliJ API usages while preserving read locking and formatting behavior.</li>
+            <li>Keep support for IntelliJ IDEA 2025.3–2026.2.</li>
+            <li>Continue using Spotless Bridge Gradle plugin ${version}; no project configuration changes are needed.</li>
         </ul>
-        <p>No changes to formatting behavior or compatibility requirements.</p>
         <h3>한국어</h3>
+        <p><b>IntelliJ 플러그인 ${version}</b> — 호환성 개선.</p>
         <ul>
-            <li>Spotless Bridge 플러그인 아이콘을 추가했습니다.</li>
-            <li>Marketplace 설치 안내에 맞춰 설정 가이드 링크를 갱신했습니다.</li>
+            <li>기존 읽기 잠금과 포맷 동작을 유지하면서 deprecated IntelliJ API 사용 3곳을 제거했습니다.</li>
+            <li>IntelliJ IDEA 2025.3~2026.2 지원을 유지합니다.</li>
+            <li>Spotless Bridge Gradle 플러그인은 ${version}을 그대로 사용합니다. 프로젝트 설정 변경은 필요하지 않습니다.</li>
         </ul>
-        <p>포맷 동작과 호환성 요구 사항은 기존과 같습니다.</p>
         <p><a href="https://github.com/pozafly/spotless-bridge/blob/main/CHANGELOG.md">Full changelog / 전체 변경 내역</a></p>
     ]]></change-notes>
     <idea-version since-build="${ideaSdkBuild}" until-build="262.*"/>

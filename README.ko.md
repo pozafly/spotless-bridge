@@ -172,19 +172,36 @@ IntelliJ IDEA의 **Settings → Plugins → Marketplace**에서 **Spotless Bridg
 지원 버전은 IntelliJ IDEA **2025.3~2026.2**이며,
 [검증한 버전 목록](docs/install-from-source.ko.md#게시-없이-동일-zip으로-여러-ide-검증)을 참고하세요.
 
-설치한 뒤에는 다음과 같이 설정합니다.
+**IDE 플러그인 설치 외에 프로젝트 설정도 필요합니다.** 프로젝트에 Gradle wrapper,
+**8.14.3 이상·10.0 미만의 Gradle**, Java 포맷 규칙을 설정한 **Spotless 8.x**가 있어야 하며,
+루트 프로젝트에 `io.github.pozafly.spotlessbridge` Gradle 플러그인 **0.2.2**를 적용해야 합니다.
+[빠른 시작의 플러그인 적용 단계](#1-플러그인-적용)에서 Groovy/Kotlin DSL 예시를 참고한 뒤 Gradle을 동기화하세요.
+각 모듈의 기존 Spotless 설정은 유지합니다. IDE 플러그인만 사용할 때는 AI hook 설정이 필요하지 않습니다.
+
+IDE 플러그인을 설치하고 프로젝트를 준비한 뒤에는 다음과 같이 설정합니다.
 
 1. **Settings → Tools → Spotless Bridge**에서 플러그인을 켭니다.
-   포매터 요구 사항을 만족하는 JDK 17 이상 경로를 지정하고, hook과 같은 JDK를 사용하세요.
-2. 필요하면 Gradle 루트를 지정합니다. AI hook과 같은 루트를 사용하세요.
+   Gradle과 포매터 요구 사항을 만족하는 JDK 17 이상 경로를 지정하세요. 비워 두면 프로젝트 SDK를 사용합니다.
+   AI hook을 함께 쓴다면 같은 JDK를 사용하세요.
+2. **Gradle root**를 비워 두면 각 Java 파일에서 가장 가까운 wrapper를 찾습니다. 필요하면 직접 지정하세요.
+   AI hook을 함께 쓴다면 같은 루트를 사용하세요.
 3. Java 소스 파일에서 **Reformat Code**를 실행하면 Spotless 규칙으로 포맷됩니다.
-4. 저장할 때 자동으로 포맷하려면 **Tools → Actions on Save → Reformat code**에서 **Java / Whole file**을 선택합니다.
+   첫 요청에서는 Gradle을 실행해 규칙을 읽고 daemon을 시작합니다.
+4. 저장할 때 자동으로 포맷하려면 **Settings → Tools → Actions on Save → Reformat code**에서 **Java / Whole file**을 선택합니다.
    포맷 결과가 다시 바뀌지 않도록 다른 Java 포매터와 Optimize imports·Rearrange code·Code cleanup 저장 동작은 끄세요.
 
 참고 사항:
 
-- IntelliJ가 소스로 인식하는, 쓰기 가능한 로컬 Java 파일만 처리합니다. 선택 영역만 포맷하는 기능은 지원하지 않습니다.
+- IntelliJ가 소스로 인식하고 Spotless 대상에 포함된, 쓰기 가능한 로컬 Java 파일만 처리합니다.
+  선택 영역만 포맷하는 기능은 지원하지 않습니다.
 - Safe Mode에서는 프로젝트를 신뢰하기 전까지 포맷하지 않습니다.
+- 저장된 빌드 설정은 다음 포맷 요청에서 다시 읽습니다. 외부 설정 파일은 **Extra watched paths**에
+  Gradle 루트 기준 경로를 한 줄에 하나씩 추가하세요. 수동으로 다시 읽으려면 플러그인 설정의
+  **Reload Spotless configuration on next format**을 누르세요.
+
+도움이 필요하면 [문제 해결](#문제-해결)을 확인하거나 [이슈를 등록](https://github.com/pozafly/spotless-bridge/issues)하세요.
+IDE·Bridge·Gradle·JDK·Spotless 버전, 재현 단계, 오류 메시지를 함께 적어 주세요.
+[소스 코드](https://github.com/pozafly/spotless-bridge)와 [변경 내역](CHANGELOG.md)은 GitHub에서 확인할 수 있습니다.
 
 ## 어떻게 동작하나요?
 
