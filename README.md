@@ -272,7 +272,7 @@ See [CHANGELOG.md](CHANGELOG.md) for changes in each version and how to upgrade.
 ## Contributing
 
 To build Bridge from source, run its tests, or try unreleased changes, see [Install from source](docs/install-from-source.md).
-Implementation and release notes are in the [maintainer notes (Korean)](docs/maintenance.md).
+Implementation details and regression checks are in the [development guide (Korean)](docs/maintenance.md).
 
 ## License
 

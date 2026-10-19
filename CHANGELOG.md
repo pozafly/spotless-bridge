@@ -1,7 +1,6 @@
 # Changelog
 
-All notable changes to Spotless Bridge are documented here. The release workflow publishes the section
-for each `v<version>` tag as its GitHub Release notes.
+All notable changes to Spotless Bridge are documented here.
 
 ## [0.2.1] - 2026-10-16
 

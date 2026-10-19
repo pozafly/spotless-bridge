@@ -1,8 +1,11 @@
-# Spotless Bridge 유지보수
+# Spotless Bridge 개발 안내
+
+Spotless Bridge의 구조를 이해하고 코드를 수정·검증하는 기여자를 위한 문서입니다.
+로컬 빌드와 설치 방법은 [소스 설치 안내](install-from-source.ko.md)를 참고하세요.
 
 ## 소유권과 호환성
 
-Java 배포 버전은 `gradle.properties`, Rust CLI 버전은 `native/Cargo.toml`에서 같은 값으로 관리하며 `selfTest` 인자로 전달해 Groovy/Kotlin 소비 프로젝트에서도 같은 버전을 사용합니다. 소비 프로젝트는 Gradle 플러그인 버전을 선택하고,
+Gradle 플러그인 버전은 `gradle.properties`, Rust CLI 버전은 `native/Cargo.toml`에서 같은 값으로 관리하며 `selfTest` 인자로 전달해 Groovy/Kotlin 소비 프로젝트에서도 같은 버전을 사용합니다. 소비 프로젝트는 Gradle 플러그인 버전을 선택하고,
 별도로 Spotless·포매터 버전과 규칙을 소유합니다. IDE ZIP에는 연결 코드만 들어갑니다.
 
 `SpotlessBridgePlugin`은 루트 프로젝트에 시작·적용·상태·종료 태스크를 등록합니다.
@@ -89,17 +92,14 @@ JAVA_HOME=/path/to/jdk21 ./gradlew check engineDist \
 기본값은 빌드 JVM의 홈 경로입니다. 테스트 프로세스, 소비 Gradle, daemon, worker와 hook이 같은 JDK를 사용하며,
 테스트는 환경 변수·실행 JVM 일치, daemon endpoint의 JDK, hook runtime의 JDK를 검사합니다.
 CI는 소비 JDK를 준비한 뒤 빌드 JDK를 21로 설정하고, 소비 JDK 경로를 `testJavaHome`으로 명시합니다.
-아홉 조합을 로컬 macOS의 Zulu 17.0.20.1, Corretto 21.0.6, Temurin 25.0.4.1로 검증합니다.
 엔진 class major version은 61이며, Gradle Module Metadata의 JVM 버전은 17입니다.
-같은 엔진 JAR를 모든 소비 JDK에서 사용합니다. 이번 변경의 GitHub CI 실행은 push 후 별도 확인해야 합니다.
+같은 엔진 JAR를 모든 소비 JDK에서 사용합니다.
 임의의 상위 JDK나 Java 25의 모든 문법 지원을 의미하지 않습니다.
 
 Google Java Format은 JDK 17 테스트에서 1.28.0, JDK 21·25에서 1.30.0을 사용합니다.
 JDK 17에서 1.30.0을 지정하면 실패하며 파일을 보존하는지, 1.28.0으로 복구하면 정상 포맷되는지도 검사합니다.
 이 분기는 테스트 fixture에만 적용합니다. 운영 엔진은 프로젝트가 선택한 포매터 버전을 바꾸지 않습니다.
 Gradle·Spotless 버전 정책 검사는 JDK 17·21의 Gradle 8.14.3 조합에서 실행합니다.
-기존 공개 `v0.1.0` 태그·Release는 Java 21 대상으로 남겨 두며 이 변경으로 교체하지 않습니다.
-
 
 `check`는 `build/repository`에 marker와 구현 JAR를 게시하고, 임시 소비 프로젝트에서 실제로 해석합니다.
 따라서 source classpath만 연결한 테스트와 달리 플러그인 패키징·배포 메타데이터도 경로에 포함됩니다.
@@ -118,16 +118,16 @@ Gradle·Spotless 버전 정책 검사는 JDK 17·21의 Gradle 8.14.3 조합에�
 `gradle/idea-compatibility.json`, Verifier 버전은 `gradle.properties`에서 관리합니다. 첫 SDK 항목이
 최소 지원 빌드와 컴파일 SDK를 결정합니다. SDK 변경 시 해시·설치 허용 범위·검사 결과를 함께 확인하세요. Verifier는 문제를 발견해도 종료 코드 0을 반환할 수 있어
 문제 리포트도 확인하며, 매번 이전 리포트를 지워 잘못된 성공 판정을 막습니다.
-실제 IDE UI 저장 동작과 Marketplace 승인은 별도입니다. IDE 검증 상세는
+실제 IDE UI 저장 동작은 별도로 확인해야 합니다. IDE 검증 상세는
 [소스 설치 안내](install-from-source.ko.md#게시-없이-동일-zip으로-여러-ide-검증)를 참고하세요.
 
 `verify.yml`은 Ubuntu 조합에 더해 macOS에서 Gradle 8.14.3·JDK 17과 Gradle 9.8.1·JDK 21을 실행합니다. Windows x64·ARM64는 별도의 `native.yml`에서 JDK 21·Gradle 8.14.3으로 CLI와 런처를 검사합니다.
 `spotless-latest.yml`은 매주 월요일 Plugin Portal의 최신 Spotless 버전을 찾아 `-PtestSpotlessVersion`으로 전체 검사를 실행합니다.
 이 job이 실패하면 Spotless 내부 API 변경이나 허용 범위 밖 버전(예: 9.x)이 나온 것이므로 지원 범위와 구현을 점검하세요.
 
-## 배포 준비
+## 로컬 패키징
 
-`com.gradle.plugin-publish`로 구현 JAR, sources/javadoc, plugin marker와 Portal 메타데이터를 생성합니다.
+`com.gradle.plugin-publish`로 구현 JAR, sources/javadoc, plugin marker와 플러그인 메타데이터를 생성합니다.
 `./gradlew publishAllPublicationsToTestRepository`는 로컬 파일 저장소에만 게시합니다. `-PspotlessBridgeRepository=/path/to/project/.gradle/spotless-bridge-repository`로 게시 위치를 지정할 수 있습니다.
 
 라이선스는 MIT이며 `LICENSE`를 모든 JAR의 `META-INF`에 포함하고 Maven POM에도 기록합니다.
@@ -141,26 +141,13 @@ hook 런처(`src/main/resources/spotless-bridge/spotless-bridge`, `.cmd`)는 플
 Gradle로 복원한 뒤 요청합니다. 그 밖의 Java 대체 경로는 `GradleFormatter --hook <root> <files...>`를 사용합니다.
 0.1.0 스크립트가 쓰는 `<root> <list-file>` 호출 방식도 계속 지원합니다. Windows 런처는 native CI에서 검사합니다.
 
-공개 게시 전 버전, GitHub 저장소 주소, 호환성 검증과 Plugin Portal 계정 소유권을 확인하세요.
-게시 자격 증명은 Git에 넣지 않고 저장소 secret `GRADLE_PUBLISH_KEY`, `GRADLE_PUBLISH_SECRET`에 둡니다.
-태그를 만들기 전에 `CHANGELOG.md`에 `## [<version>]` 섹션을 추가합니다. `release.yml`은 `v<version>` 태그를 push하면 태그와 `gradle.properties`의 버전이 같은지 확인하고 `check engineDist`를 거쳐
-`publishPlugins`를 실행한 뒤, 해당 CHANGELOG 섹션으로 GitHub Release를 만듭니다(이미 있으면 노트를 갱신).
-IntelliJ ZIP은 IDE 빌드 job에서 한 번 만들어 artifact로 보관하며, Marketplace나 GitHub Release에는 자동 게시하지 않습니다.
-Actions에서 수동 실행하면 기본값으로 `publishPlugins --validate-only`만 수행합니다.
-태그를 push하기 전에 수동 실행으로 메타데이터와 자격 증명을 먼저 확인하세요. 두 옵션의 차이는
-[Gradle 공식 배포 문서](https://docs.gradle.org/current/userguide/publishing_gradle_plugins.html)를 참고하세요.
-이 저장소의 일반 build/check는 공개 게시를 수행하지 않습니다.
+## Rust CLI 빌드와 검증
 
-IDE ZIP의 Marketplace 업로드는 별도 절차입니다. 실제 설치·설정 변경은 사용자에게 맡깁니다.
-
-## Rust CLI 배포
-
-`native/`는 외부 crate 없는 Rust 1.90.0 클라이언트입니다. `gradle.properties`와 `native/Cargo.toml` 버전을 함께 올립니다.
+`native/`는 외부 crate 없는 Rust 1.90.0 클라이언트입니다.
 기본 Gradle 빌드는 호스트용 실행 파일을 JAR에 포함합니다. 사용자의 컴퓨터에서는 Cargo를 실행하지 않습니다.
 `.github/workflows/native.yml`이 macOS·Linux·Windows의 x64·ARM64에서 단위 테스트와 실제 소비 프로젝트 검사를 수행합니다.
 Windows ARM64의 준비 단계는 Gradle 8.14.3의 환경변수 갱신 문제를 피하려고 `--no-daemon`을 사용합니다. warm 요청에는 영향이 없습니다.
 Windows JVM의 Unicode 인자 손실을 피하려고 classpath는 상대 경로, worker의 snapshot 인자는 ASCII URI를 사용합니다.
 daemon 종료는 worker와 JVM의 실제 종료까지 기다려 Windows의 JAR 파일 잠금을 해제합니다.
-Linux는 musl로 정적 링크합니다. 이 여섯 artifact를 모은 JAR로 기존 JDK·Gradle 매트릭스를 검사하고 배포합니다.
-`-PnativeCliDirectory=build/native`는 이미 빌드한 artifact를 사용하는 옵션이며, `verifyNativeDistribution`이 누락을 차단합니다.
-전체 플랫폼 확인은 GitHub CI가 실행된 뒤 판정합니다. 로컬 macOS 통과를 Windows·Linux 통과로 표현하지 않습니다.
+Linux는 musl로 정적 링크합니다. CI는 여섯 플랫폼의 CLI를 포함한 JAR로 JDK·Gradle 매트릭스를 검사합니다.
+플랫폼별 검사 결과는 해당 CI 실행에서 확인합니다.

@@ -87,14 +87,14 @@ JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-r
 This runs the Safe Mode regression tests, builds one ZIP with 2025.3, and checks that ZIP with
 Plugin Verifier **1.410** against the first release and pinned latest patch of each supported series:
 
-| IntelliJ IDEA | Build |
-| --- | --- |
-| 2025.3 | `253.28294.334` |
-| 2025.3.6.1 | `253.33813.55` |
-| 2026.1 | `261.22158.277` |
-| 2026.1.5 | `261.27258.48` |
-| 2026.2 | `262.8665.258` |
-| 2026.2.3 | `262.10968.63` |
+| IntelliJ IDEA | Build           |
+| ------------- | --------------- |
+| 2025.3        | `253.28294.334` |
+| 2025.3.6.1    | `253.33813.55`  |
+| 2026.1        | `261.22158.277` |
+| 2026.1.5      | `261.27258.48`  |
+| 2026.2        | `262.8665.258`  |
+| 2026.2.3      | `262.10968.63`  |
 
 On October 16, 2026, the 0.1.1 ZIP passed all six checks above. The 2025.3 builds reported `Compatible`;
 the 2026.1 and 2026.2 builds reported `Compatible` with three deprecated API usages, explained below.
