@@ -64,6 +64,27 @@ In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.2.1"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
+Spotless Bridge is published to both the [Gradle Plugin Portal](https://plugins.gradle.org/plugin/io.github.pozafly.spotlessbridge)
+and [Maven Central](https://central.sonatype.com/artifact/io.github.pozafly.spotlessbridge/spotless-bridge).
+Maven Central provides both the implementation and plugin marker starting with **0.2.1**.
+
+To resolve Bridge from Maven Central, add `mavenCentral()` to `pluginManagement.repositories` in
+`settings.gradle` or `settings.gradle.kts`. Merge this into your existing block, or add the block at the top
+of the settings file. The following works in both Groovy and Kotlin DSL:
+
+```groovy
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+The plugin ID and version in `build.gradle` stay the same. Keep the repositories needed by your other
+plugins. For an internal Nexus setup, configure your organization's Maven Central proxy in this same
+`pluginManagement.repositories` block; it must serve both the marker and implementation artifacts.
+
 ### 2. Format the project
 
 ```sh

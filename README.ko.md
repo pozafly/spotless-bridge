@@ -64,6 +64,27 @@ Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.2.1"`을 
 기존 Spotless 버전과 규칙은 그대로 두세요. 멀티 프로젝트 빌드라면 Bridge는 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 건드리지 않아도 됩니다.
 
+Spotless Bridge는 [Gradle Plugin Portal](https://plugins.gradle.org/plugin/io.github.pozafly.spotlessbridge)과
+[Maven Central](https://central.sonatype.com/artifact/io.github.pozafly.spotlessbridge/spotless-bridge)에서 받을 수 있습니다.
+Maven Central에는 **0.2.1부터** 구현체와 plugin marker를 함께 제공합니다.
+
+Maven Central에서 Bridge를 받으려면 `settings.gradle` 또는 `settings.gradle.kts`의
+`pluginManagement.repositories`에 `mavenCentral()`을 추가하세요. 기존 블록이 있으면 그 안에 추가하고,
+없으면 설정 파일 맨 위에 아래 블록을 넣습니다. Groovy와 Kotlin DSL 모두 같은 문법입니다.
+
+```groovy
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+`build.gradle`의 플러그인 ID와 버전은 그대로 사용합니다. 다른 플러그인에 필요한 저장소도 유지하세요.
+내부 Nexus를 사용한다면 같은 `pluginManagement.repositories` 블록에 회사의 Maven Central 프록시 저장소를
+설정하세요. 해당 저장소에서 marker와 구현체를 모두 받을 수 있어야 합니다.
+
 ### 2. 프로젝트 포맷
 
 ```sh
