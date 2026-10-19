@@ -21,6 +21,21 @@ gradlePlugin {
 publishing { repositories { maven { name = 'test'; url = providers.gradleProperty('spotlessBridgeRepository').orElse(layout.buildDirectory.dir('repository').map { it.asFile.absolutePath }) } } }
 
 publishing.publications.withType(MavenPublication).configureEach {
+    pom.name = 'Spotless Bridge'
+    pom.description = "Format Java with the project's own Spotless rules through a shared daemon."
+    pom.url = 'https://github.com/pozafly/spotless-bridge'
+    pom.developers {
+        developer {
+            id = 'pozafly'
+            name = 'pozafly'
+            url = 'https://github.com/pozafly'
+        }
+    }
+    pom.scm {
+        connection = 'scm:git:https://github.com/pozafly/spotless-bridge.git'
+        developerConnection = 'scm:git:ssh://git@github.com/pozafly/spotless-bridge.git'
+        url = 'https://github.com/pozafly/spotless-bridge'
+    }
     pom.licenses {
         license {
             name = 'MIT License'
@@ -145,6 +160,41 @@ tasks.register('verifyNativeDistribution') {
     }
 }
 tasks.named('publishPlugins') { dependsOn 'verifyNativeDistribution' }
+
+// Opt in to signed, local Central Portal bundles. No remote publishing repository is added.
+if (providers.gradleProperty('centralPublishing').getOrElse('false').toBoolean()) {
+    apply plugin: 'signing'
+    signing {
+        useInMemoryPgpKeys(providers.gradleProperty('signingKey').orNull,
+                providers.gradleProperty('signingPassword').orNull)
+        sign publishing.publications
+    }
+    def centralRepository = layout.buildDirectory.dir('central-repository')
+    publishing.repositories.maven {
+        name = 'centralBundle'
+        url = centralRepository
+    }
+    def cleanCentralRepository = tasks.register('cleanCentralBundleRepository', Delete) {
+        delete centralRepository
+    }
+    tasks.withType(PublishToMavenRepository).configureEach {
+        if (name.endsWith('ToCentralBundleRepository')) {
+            dependsOn cleanCentralRepository, 'verifyNativeDistribution'
+        }
+    }
+    tasks.register('centralBundle', Zip) {
+        group = 'publishing'
+        description = 'Build a signed Central Portal ZIP locally, including the implementation and plugin marker'
+        dependsOn 'publishAllPublicationsToCentralBundleRepository'
+        from(centralRepository) {
+            exclude '**/maven-metadata.xml*', '**/*.asc.*'
+        }
+        archiveFileName = "${project.name}-${project.version}-central.zip"
+        destinationDirectory = layout.buildDirectory.dir('distributions')
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+}
 
 tasks.register('engineDist', Sync) {
     dependsOn jar
