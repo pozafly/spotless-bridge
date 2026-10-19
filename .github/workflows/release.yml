@@ -1,16 +1,20 @@
-name: Release to Gradle Plugin Portal
-# Pushing a v<version> tag verifies the build, publishes the Gradle plugin, and creates the GitHub Release
-# from that version's CHANGELOG.md section.
-# Run manually to validate the Portal metadata and credentials without publishing.
+name: Release to Plugin Portal and Maven Central
+# A version tag publishes to both repositories and creates the GitHub Release.
+# Manual runs validate locally by default; publishing requires an existing version tag.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish to the Plugin Portal (otherwise only --validate-only)"
+        description: "Publish the selected repositories (otherwise validate and build the signed ZIP only)"
         type: boolean
         default: false
+      repository:
+        description: "Select one repository to recover a partially completed release"
+        type: choice
+        options: [both, plugin-portal, maven-central]
+        default: both
 permissions:
   contents: write
 concurrency:
@@ -22,7 +26,10 @@ jobs:
   publish:
     needs: native-clients
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    env:
+      PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+      RELEASE_REPOSITORY: ${{ inputs.repository || 'both' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
@@ -30,55 +37,124 @@ jobs:
           pattern: native-*
           merge-multiple: true
           path: build/native
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-      - name: Check that the tag matches the project version
-        if: github.event_name == 'push'
+      - name: Check release configuration
+        env:
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
           version=$(sed -n 's/^version=//p' gradle.properties)
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match version=$version in gradle.properties" >&2
+          if [ "$PUBLISH" = "true" ] && { [ "$GITHUB_REF_TYPE" != "tag" ] || [ "$GITHUB_REF_NAME" != "v$version" ]; }; then
+            echo "Publishing requires the v$version tag; select that tag for a manual retry." >&2
             exit 1
           fi
+          required=(SIGNING_KEY SIGNING_PASSWORD)
+          if [ "$RELEASE_REPOSITORY" != "maven-central" ]; then
+            required+=(GRADLE_PUBLISH_KEY GRADLE_PUBLISH_SECRET)
+          fi
+          if [ "$PUBLISH" = "true" ] && [ "$RELEASE_REPOSITORY" != "plugin-portal" ]; then
+            required+=(MAVEN_CENTRAL_USERNAME MAVEN_CENTRAL_PASSWORD)
+          fi
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "Set the $name repository secret before running this workflow." >&2
+              exit 1
+            fi
+          done
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
       - name: Extract release notes from CHANGELOG.md
-        if: github.event_name == 'push'
+        if: env.PUBLISH == 'true'
         run: |
-          version=${GITHUB_REF_NAME#v}
-          awk -v header="## [$version]" '
+          awk -v header="## [$RELEASE_VERSION]" '
             index($0, header) == 1 { found = 1; next }
             found && /^## \[/ { exit }
             found && !/^\[[^]]*\]: / { print }
           ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
-            echo "CHANGELOG.md has no section for [$version]" >&2
+            echo "CHANGELOG.md has no section for [$RELEASE_VERSION]" >&2
             exit 1
           fi
       - name: Verify
         run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native check engineDist
-      - name: Publish
+      - name: Build signed Central bundle
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native -PcentralPublishing=true centralBundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: central-bundle-${{ env.RELEASE_VERSION }}
+          path: build/distributions/spotless-bridge-${{ env.RELEASE_VERSION }}-central.zip
+          if-no-files-found: error
+      - name: Validate or publish to Plugin Portal
+        if: env.RELEASE_REPOSITORY != 'maven-central'
         env:
           GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
           GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
-          PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: |
-          if [ -z "$GRADLE_PUBLISH_KEY" ] || [ -z "$GRADLE_PUBLISH_SECRET" ]; then
-            echo "Set the GRADLE_PUBLISH_KEY and GRADLE_PUBLISH_SECRET repository secrets first." >&2
+          args=()
+          if [ "$PUBLISH" != "true" ]; then
+            args+=(--validate-only)
+          fi
+          ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native -PcentralPublishing=true publishPlugins "${args[@]}"
+      - name: Publish to Maven Central and wait for completion
+        if: env.PUBLISH == 'true' && env.RELEASE_REPOSITORY != 'plugin-portal'
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          token=$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 | tr -d '\n')
+          echo "::add-mask::$token"
+          api=https://central.sonatype.com/api/v1/publisher
+          bundle="build/distributions/spotless-bridge-$RELEASE_VERSION-central.zip"
+          # Do not retry uploads automatically: a lost response can still mean an accepted deployment.
+          deployment=$(curl --fail-with-body --silent --show-error --connect-timeout 20 --max-time 180 \
+            --header "Authorization: Bearer $token" \
+            --form "bundle=@$bundle;type=application/octet-stream" \
+            "$api/upload?name=spotless-bridge-$RELEASE_VERSION&publishingType=AUTOMATIC")
+          if [[ ! "$deployment" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            echo "Unexpected Central deployment ID: $deployment" >&2
             exit 1
           fi
-          if [ "$PUBLISH" = "true" ]; then
-            ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native publishPlugins
-          else
-            ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native publishPlugins --validate-only
-          fi
+          echo "Central deployment: $deployment"
+          echo "Maven Central deployment: \`$deployment\` ([Portal](https://central.sonatype.com/publishing))" >> "$GITHUB_STEP_SUMMARY"
+          deadline=$((SECONDS + 900))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            response=$(curl --fail-with-body --silent --show-error --connect-timeout 20 --max-time 60 \
+              --retry 3 --retry-delay 5 --request POST \
+              --header "Authorization: Bearer $token" "$api/status?id=$deployment")
+            state=$(jq -er '.deploymentState' <<< "$response")
+            echo "Maven Central: $state"
+            case "$state" in
+              PUBLISHED)
+                echo "Maven Central: PUBLISHED" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+                ;;
+              FAILED)
+                jq . <<< "$response"
+                exit 1
+                ;;
+              PENDING|VALIDATING|VALIDATED|PUBLISHING) sleep 10 ;;
+              *) echo "Unexpected deployment state: $state" >&2; exit 1 ;;
+            esac
+          done
+          echo "Timed out waiting for Central. Check deployment $deployment in the Portal before retrying; publication may still finish." >&2
+          exit 1
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title="Spotless Bridge ${GITHUB_REF_NAME#v}"
+          title="Spotless Bridge $RELEASE_VERSION"
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
           else

@@ -151,3 +151,53 @@ Windows JVM의 Unicode 인자 손실을 피하려고 classpath는 상대 경로,
 daemon 종료는 worker와 JVM의 실제 종료까지 기다려 Windows의 JAR 파일 잠금을 해제합니다.
 Linux는 musl로 정적 링크합니다. CI는 여섯 플랫폼의 CLI를 포함한 JAR로 JDK·Gradle 매트릭스를 검사합니다.
 플랫폼별 검사 결과는 해당 CI 실행에서 확인합니다.
+
+## Plugin Portal·Maven Central 릴리스
+
+`release.yml`은 `v<version>` 태그를 push하면 네이티브 클라이언트 여섯 개를 빌드하고,
+`check engineDist` 검증과 서명 ZIP 생성을 마친 뒤 Plugin Portal, Maven Central 순서로 배포합니다.
+같은 작업 디렉터리의 구현 JAR와 plugin marker를 사용합니다. Central은 공식 Publisher API의
+`AUTOMATIC` 방식으로 업로드하며, `PUBLISHED`까지 확인한 후 GitHub Release를 생성합니다.
+서명 ZIP은 `central-bundle-<version>` Actions artifact에도 보관합니다.
+
+처음 한 번 저장소의 **Settings → Secrets and variables → Actions → New repository secret**에 등록하세요.
+
+| Secret | 값 |
+| --- | --- |
+| `GRADLE_PUBLISH_KEY` | 기존 Plugin Portal API key |
+| `GRADLE_PUBLISH_SECRET` | 기존 Plugin Portal API secret |
+| `MAVEN_CENTRAL_USERNAME` | Central에서 생성한 User Token의 username |
+| `MAVEN_CENTRAL_PASSWORD` | 같은 User Token의 password |
+| `SIGNING_KEY` | `-----BEGIN PGP PRIVATE KEY BLOCK-----`부터 끝 줄까지 포함한 ASCII-armored 개인키 전체 |
+| `SIGNING_PASSWORD` | 개인키 암호 |
+
+Central 로그인 이메일·비밀번호가 아니라 [User Token](https://central.sonatype.com/usertoken)을 사용합니다.
+개인키는 `gpg --armor --export-secret-keys <전체 지문>`으로 내보낸 내용을 등록합니다.
+공개키는 Central이 지원하는 키 서버에 미리 등록해야 합니다. 개인키나 암호를 저장소 파일에 넣지 않습니다.
+
+릴리스할 때는 `gradle.properties`와 `native/Cargo.toml`의 버전을 맞추고 `CHANGELOG.md`에 해당 버전의
+변경 내역을 작성합니다. 워크플로 변경과 버전 변경을 커밋·push한 뒤 해당 커밋에 태그를 붙입니다.
+예를 들어 다음 새 버전은 아래처럼 배포합니다.
+
+```sh
+git tag v0.2.2
+git push origin v0.2.2
+```
+
+태그 push는 양쪽 저장소에 실제 공개 배포합니다. 이미 공개된 버전의 태그를 옮기거나 같은 버전을 덮어쓰지 않습니다.
+수동 `Run workflow`는 `publish=false`가 기본이며, 검증·서명 ZIP 생성과 Plugin Portal의 `--validate-only`만
+수행합니다. Central 업로드나 공개 배포는 하지 않으며 Central 서버의 인증·검증을 확인하는 것도 아닙니다.
+
+두 저장소의 배포는 하나의 트랜잭션이 아닙니다. 한쪽만 성공하면 해당 버전 태그에서 실패한 저장소만 재실행하세요.
+예를 들어 Plugin Portal은 성공하고 Central만 실패했다면:
+
+```sh
+gh workflow run release.yml --ref v0.2.2 -f publish=true -f repository=maven-central
+```
+
+반대의 경우 `repository=plugin-portal`을 사용합니다. 재실행 전에 이미 성공한 쪽의 상태를 확인하세요.
+네트워크 오류나 시간 초과라면 Central에 업로드가 접수되었거나 계속 배포 중일 수 있으므로,
+Actions 로그·요약의 deployment ID와 [Central Portal](https://central.sonatype.com/publishing)을 먼저 확인합니다.
+`PUBLISHED`인 버전을 다시 올리지 않습니다. 복구 실행이 성공하면 GitHub Release도 생성하거나 갱신합니다.
+
+API 인증·업로드·상태 값은 [Central 공식 API 문서](https://central.sonatype.org/publish/publish-portal-api/)를 따릅니다.
