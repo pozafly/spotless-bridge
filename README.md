@@ -1,6 +1,7 @@
 # Spotless Bridge
 
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.pozafly.spotlessbridge)](https://plugins.gradle.org/plugin/io.github.pozafly.spotlessbridge)
+[![JetBrains Marketplace](https://img.shields.io/badge/JetBrains-Marketplace-blue)](https://plugins.jetbrains.com/plugin/35218-spotless-bridge)
 [![Verification](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -159,15 +160,15 @@ That's it. The first request starts the daemon, and later requests reuse it.
 - Keep running your project's usual checks: `spotlessCheck`, compilation, and relevant tests.
 - If you use OpenRewrite, run it before Bridge so the rewritten code gets formatted.
 
-## IntelliJ IDEA (preview)
+## IntelliJ IDEA
 
 The IntelliJ plugin applies your Spotless rules when you run **Reformat Code** or save a Java file.
 It uses the same daemon as your AI hook. AI hooks and Gradle tasks work without it.
 
-> [!WARNING]
-> The IntelliJ plugin is still in preparation and is not on JetBrains Marketplace yet.
-> It will be published there after the Gradle plugin release. Until then, you can
-> [build and install it from source](docs/install-from-source.md#2-build-and-install-the-intellij-plugin).
+Install [Spotless Bridge from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35218-spotless-bridge),
+or open **Settings → Plugins → Marketplace** in IntelliJ IDEA, search for **Spotless Bridge**, and click **Install**.
+Restart the IDE if prompted. You can also
+[build and install it from source](docs/install-from-source.md#2-build-and-install-the-intellij-plugin).
 
 It supports IntelliJ IDEA **2025.3–2026.2**; see the
 [verified versions](docs/install-from-source.md#verify-the-same-zip-across-ide-versions-without-publishing).

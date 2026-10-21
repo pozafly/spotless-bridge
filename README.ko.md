@@ -1,6 +1,7 @@
 # Spotless Bridge
 
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.pozafly.spotlessbridge)](https://plugins.gradle.org/plugin/io.github.pozafly.spotlessbridge)
+[![JetBrains Marketplace](https://img.shields.io/badge/JetBrains-Marketplace-blue)](https://plugins.jetbrains.com/plugin/35218-spotless-bridge)
 [![Verification](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/pozafly/spotless-bridge/actions/workflows/verify.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -158,15 +159,15 @@ JAVA_HOME=/path/to/jdk .gradle/spotless-bridge/spotless-bridge \
 - `spotlessCheck`, 컴파일, 관련 테스트 같은 프로젝트의 기존 검증은 그대로 실행하세요.
 - OpenRewrite를 함께 쓴다면 OpenRewrite를 먼저 실행해야 수정된 코드까지 포맷됩니다.
 
-## IntelliJ IDEA (미리보기)
+## IntelliJ IDEA
 
 IntelliJ 플러그인은 **Reformat Code**를 실행하거나 Java 파일을 저장할 때 Spotless 규칙을 적용합니다.
 AI hook과 같은 daemon을 사용합니다. AI hook과 Gradle 태스크는 IntelliJ 플러그인 없이도 쓸 수 있습니다.
 
-> [!WARNING]
-> IntelliJ 플러그인은 아직 준비 중이며 JetBrains Marketplace에 올라가 있지 않습니다.
-> Gradle 플러그인을 배포한 뒤 Marketplace에 올릴 예정입니다. 그전까지는
-> [소스에서 빌드해 설치](docs/install-from-source.ko.md#2-intellij-플러그인-빌드와-설치)할 수 있습니다.
+[JetBrains Marketplace에서 Spotless Bridge를 설치](https://plugins.jetbrains.com/plugin/35218-spotless-bridge)하거나,
+IntelliJ IDEA의 **Settings → Plugins → Marketplace**에서 **Spotless Bridge**를 검색하고 **Install**을 누르세요.
+재시작 안내가 나오면 IDE를 재시작하세요.
+[소스에서 빌드해 설치](docs/install-from-source.ko.md#2-intellij-플러그인-빌드와-설치)할 수도 있습니다.
 
 지원 버전은 IntelliJ IDEA **2025.3~2026.2**이며,
 [검증한 버전 목록](docs/install-from-source.ko.md#게시-없이-동일-zip으로-여러-ide-검증)을 참고하세요.
