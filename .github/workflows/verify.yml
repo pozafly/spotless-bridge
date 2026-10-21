@@ -85,6 +85,7 @@ jobs:
           echo "versions=$(jq -c '[.[].version]' gradle/idea-compatibility.json)" >> "$GITHUB_OUTPUT"
           echo "IDEA_VERSION=$(jq -r '.[0].version' gradle/idea-compatibility.json)" >> "$GITHUB_ENV"
           echo "IDEA_SHA256=$(jq -r '.[0].sha256' gradle/idea-compatibility.json)" >> "$GITHUB_ENV"
+          echo "PLUGIN_VERSION=$(sed -n 's/^version=//p' gradle.properties)" >> "$GITHUB_ENV"
       - name: Download minimum IntelliJ SDK
         run: |
           archive="$RUNNER_TEMP/idea.tar.gz"
@@ -97,11 +98,13 @@ jobs:
         run: |
           ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native ideaTest pluginZip -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
           cd build/distributions
-          sha256sum spotless-bridge-*.zip > SHA256SUMS
+          sha256sum "spotless-bridge-$PLUGIN_VERSION.zip" > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: spotless-bridge-intellij-zip
-          path: build/distributions/
+          path: |
+            build/distributions/spotless-bridge-${{ env.PLUGIN_VERSION }}.zip
+            build/distributions/SHA256SUMS
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
@@ -146,7 +149,8 @@ jobs:
           IDEA_VERSION: ${{ matrix.idea }}
         run: |
           (cd build/distributions && sha256sum --check SHA256SUMS)
-          zip=$(find "$PWD/build/distributions" -maxdepth 1 -name 'spotless-bridge-*.zip')
+          version=$(sed -n 's/^version=//p' gradle.properties)
+          zip="$PWD/build/distributions/spotless-bridge-$version.zip"
           ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native verifyIdeaPlugin \
             -PideaPluginZip="$zip" -PideaVerifyVersion="$IDEA_VERSION" -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
           (cd build/distributions && sha256sum --check SHA256SUMS)
