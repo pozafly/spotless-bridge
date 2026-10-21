@@ -175,8 +175,10 @@ Central 로그인 이메일·비밀번호가 아니라 [User Token](https://cent
 개인키는 `gpg --armor --export-secret-keys <전체 지문>`으로 내보낸 내용을 등록합니다.
 공개키는 Central이 지원하는 키 서버에 미리 등록해야 합니다. 개인키나 암호를 저장소 파일에 넣지 않습니다.
 
-릴리스할 때는 `gradle.properties`와 `native/Cargo.toml`의 버전을 맞추고 `CHANGELOG.md`에 해당 버전의
-변경 내역을 작성합니다. 워크플로 변경과 버전 변경을 커밋·push한 뒤 해당 커밋에 태그를 붙입니다.
+릴리스할 때는 `gradle.properties`, `native/Cargo.toml`, `native/Cargo.lock`의 버전을 맞추고 `CHANGELOG.md`에 해당 버전의
+변경 내역을 작성합니다. 배포 전에는 `Unreleased`로 두고, 실제 릴리스할 때 배포 날짜로 바꿉니다.
+IntelliJ 업데이트 노트는 `src/idea/resources/META-INF/plugin.xml`의 `change-notes`에 작성합니다.
+워크플로 변경과 버전 변경을 커밋·push한 뒤 해당 커밋에 태그를 붙입니다.
 예를 들어 다음 새 버전은 아래처럼 배포합니다.
 
 ```sh

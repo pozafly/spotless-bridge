@@ -1,13 +1,90 @@
-<idea-plugin>
+<idea-plugin url="https://github.com/pozafly/spotless-bridge">
     <id>io.github.pozafly.spotlessbridge</id>
     <name>Spotless Bridge</name>
     <version>${version}</version>
-    <vendor>pozafly</vendor>
+    <vendor url="https://github.com/pozafly">pozafly</vendor>
     <description><![CDATA[
-        Persistent formatter using the project's evaluated spotless { java { ... } } configuration.
-        Enable per project under Settings > Tools > Spotless Bridge.
-        Automatically reloads saved build configuration on the next format request. Reuses the worker while configuration is unchanged.
+        <p>Format Java with your project's Spotless rules when you run Reformat Code or save a file.</p>
+        <ul>
+            <li>Use the formatter versions and rules from your existing <code>spotless { java { ... } }</code> configuration.</li>
+            <li>Reuse a project daemon across IntelliJ and AI hooks, avoiding Gradle startup on repeated requests while configuration is unchanged.</li>
+            <li>Reload saved build configuration on the next format request.</li>
+        </ul>
+        <h3>Requirements</h3>
+        <p>IntelliJ IDEA 2025.3–2026.2 and a Gradle project with its wrapper, Gradle 8.14.3 or newer (below 10.0),
+        Spotless 8.x with Java formatting configured, and JDK 17 or newer. Your Gradle and formatter versions may require a newer JDK.</p>
+        <p>The IDE plugin also requires the Spotless Bridge Gradle plugin in your project. It does not install or configure Spotless for you.</p>
+        <h3>Getting started</h3>
+        <ol>
+            <li>Add <code>id 'io.github.pozafly.spotlessbridge' version '${version}'</code> to the root build's
+            <code>plugins</code> block, or <code>id("io.github.pozafly.spotlessbridge") version "${version}"</code> in Kotlin DSL.
+            Keep your existing Spotless configuration and sync Gradle.</li>
+            <li>Open <b>Settings &gt; Tools &gt; Spotless Bridge</b> and enable <b>Use Spotless Bridge in this project</b>.
+            Set a compatible JDK home, or leave it empty to use the project SDK.</li>
+            <li>Leave <b>Gradle root</b> empty to find the nearest wrapper from each Java file, or set it explicitly.
+            If you use an AI hook, use the same Gradle root and JDK.</li>
+            <li>Run <b>Reformat Code</b> on a Java source file. The first request runs Gradle to load the rules and start the daemon.</li>
+            <li>For formatting on save, enable <b>Settings &gt; Tools &gt; Actions on Save &gt; Reformat code</b>
+            with <b>Java / Whole file</b>. Disable other Java formatters and the <b>Optimize imports</b>,
+            <b>Rearrange code</b>, and <b>Code cleanup</b> save actions so they do not change the result afterward.</li>
+        </ol>
+        <p>Formatting applies to writable local Java source files included in your Spotless targets.
+        Selection-only formatting is not supported. In Safe Mode, formatting stays disabled until you trust the project.</p>
+        <p><a href="https://github.com/pozafly/spotless-bridge#intellij-idea">Setup guide</a> |
+        <a href="https://github.com/pozafly/spotless-bridge#troubleshooting">Troubleshooting</a> |
+        <a href="https://github.com/pozafly/spotless-bridge/issues">Report an issue</a> |
+        <a href="https://github.com/pozafly/spotless-bridge">Source code</a></p>
+        <h3>한국어</h3>
+        <p>Reformat Code를 실행하거나 파일을 저장할 때, 프로젝트의 Spotless 규칙으로 Java 코드를 포맷합니다.</p>
+        <ul>
+            <li>기존 <code>spotless { java { ... } }</code> 설정에 지정된 포매터 버전과 규칙을 사용합니다.</li>
+            <li>IntelliJ와 AI hook이 프로젝트 daemon을 공유합니다. 설정이 바뀌지 않은 상태에서 반복 요청할 때는 Gradle 실행을 생략합니다.</li>
+            <li>저장된 빌드 설정은 다음 포맷 요청에서 다시 읽습니다.</li>
+        </ul>
+        <h3>요구 사항</h3>
+        <p>IntelliJ IDEA 2025.3~2026.2와 Gradle wrapper가 있는 프로젝트가 필요합니다.
+        Gradle 8.14.3 이상·10.0 미만, Java 포맷 규칙이 설정된 Spotless 8.x, JDK 17 이상을 사용하세요.
+        Gradle과 포매터 버전에 따라 더 높은 JDK가 필요할 수 있습니다.</p>
+        <p>프로젝트에 <b>Spotless Bridge Gradle 플러그인도 적용되어 있어야 합니다.</b>
+        IDE 플러그인이 Spotless를 대신 설치하거나 설정해 주지는 않습니다.</p>
+        <h3>시작하기</h3>
+        <ol>
+            <li>루트 빌드의 <code>plugins</code> 블록에
+            <code>id 'io.github.pozafly.spotlessbridge' version '${version}'</code>을 추가합니다.
+            Kotlin DSL에서는 <code>id("io.github.pozafly.spotlessbridge") version "${version}"</code>을 사용합니다.
+            기존 Spotless 설정은 유지하고 Gradle을 동기화하세요.</li>
+            <li><b>Settings &gt; Tools &gt; Spotless Bridge</b>에서 <b>Use Spotless Bridge in this project</b>를 켭니다.
+            요구 사항에 맞는 JDK 경로를 지정하거나, 비워 두어 프로젝트 SDK를 사용하세요.</li>
+            <li><b>Gradle root</b>를 비워 두면 각 Java 파일에서 가장 가까운 wrapper를 찾습니다. 필요하면 직접 지정하세요.
+            AI hook을 함께 사용한다면 같은 Gradle 루트와 JDK를 사용하세요.</li>
+            <li>Java 소스 파일에서 <b>Reformat Code</b>를 실행합니다.
+            첫 요청에서는 Gradle을 실행해 규칙을 읽고 daemon을 시작합니다.</li>
+            <li>저장할 때 포맷하려면 <b>Settings &gt; Tools &gt; Actions on Save &gt; Reformat code</b>에서
+            <b>Java / Whole file</b>을 설정합니다. 포맷 결과가 이후에 바뀌지 않도록 다른 Java 포매터와
+            <b>Optimize imports</b>, <b>Rearrange code</b>, <b>Code cleanup</b> 저장 동작은 끄세요.</li>
+        </ol>
+        <p>Spotless 대상에 포함된, 쓰기 가능한 로컬 Java 소스 파일을 포맷합니다.
+        선택 영역만 포맷하는 기능은 지원하지 않습니다. Safe Mode에서는 프로젝트를 신뢰하기 전까지 포맷하지 않습니다.</p>
+        <p><a href="https://github.com/pozafly/spotless-bridge/blob/main/README.ko.md#intellij-idea">설정 안내</a> |
+        <a href="https://github.com/pozafly/spotless-bridge/blob/main/README.ko.md#문제-해결">문제 해결</a> |
+        <a href="https://github.com/pozafly/spotless-bridge/issues">이슈 등록</a> |
+        <a href="https://github.com/pozafly/spotless-bridge">소스 코드</a></p>
     ]]></description>
+    <change-notes><![CDATA[
+        <p><b>IntelliJ plugin ${version}</b></p>
+        <ul>
+            <li>Add the Spotless Bridge plugin icon.</li>
+            <li>Update setup guide links for the Marketplace installation instructions.</li>
+        </ul>
+        <p>No changes to formatting behavior or compatibility requirements.</p>
+        <h3>한국어</h3>
+        <ul>
+            <li>Spotless Bridge 플러그인 아이콘을 추가했습니다.</li>
+            <li>Marketplace 설치 안내에 맞춰 설정 가이드 링크를 갱신했습니다.</li>
+        </ul>
+        <p>포맷 동작과 호환성 요구 사항은 기존과 같습니다.</p>
+        <p><a href="https://github.com/pozafly/spotless-bridge/blob/main/CHANGELOG.md">Full changelog / 전체 변경 내역</a></p>
+    ]]></change-notes>
     <idea-version since-build="${ideaSdkBuild}" until-build="262.*"/>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>

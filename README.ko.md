@@ -57,11 +57,11 @@ Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // 기존 Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.2.1'
+    id 'io.github.pozafly.spotlessbridge' version '0.2.2'
 }
 ```
 
-Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.2.1"`을 추가합니다.
+Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.2.2"`을 추가합니다.
 기존 Spotless 버전과 규칙은 그대로 두세요. 멀티 프로젝트 빌드라면 Bridge는 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 건드리지 않아도 됩니다.
 

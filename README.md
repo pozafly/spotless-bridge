@@ -57,11 +57,11 @@ Add Spotless Bridge to the `plugins` block of your **root** `build.gradle`, next
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // your existing Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.2.1'
+    id 'io.github.pozafly.spotlessbridge' version '0.2.2'
 }
 ```
 
-In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.2.1"`.
+In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.2.2"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 

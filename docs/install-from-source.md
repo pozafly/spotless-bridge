@@ -15,7 +15,7 @@ You need a Spotless Bridge source checkout and **JDK 21**. The examples use thes
 Install Rust via rustup before building from source. `native/rust-toolchain.toml` pins Rust 1.90.0;
 Cargo builds the host CLI automatically when Gradle processes resources. The native client has no external crates.
 This prerequisite applies only to Bridge contributors: users of a published plugin do not install Rust.
-Use version `0.2.1` in your consumer when testing this checkout's local repository.
+Use version `0.2.2` in your consumer when testing this checkout's local repository.
 
 ```sh
 ./gradlew testNativeCli nativeSmokeTest
@@ -73,8 +73,8 @@ Adapter bytecode is Java 21; the engine remains Java 17.
 The ZIP declares builds `253.28294.334` through `262.*` (2025.3–2026.2).
 
 In IntelliJ, open **Settings → Plugins → gear menu → Install Plugin from Disk…** and select
-`build/distributions/spotless-bridge-0.2.1.zip`. If you installed an earlier development build,
-disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea-preview).
+`build/distributions/spotless-bridge-0.2.2.zip`. If you installed an earlier development build,
+disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea).
 
 ### Verify the same ZIP across IDE versions without publishing
 
@@ -103,7 +103,7 @@ To verify an already built ZIP against one pinned version without compiling it a
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
-  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.1.zip \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.2.zip \
   -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
 ```
 

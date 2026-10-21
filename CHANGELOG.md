@@ -2,6 +2,27 @@
 
 All notable changes to Spotless Bridge are documented here.
 
+## [0.2.2] - 2026-10-22
+
+### Gradle plugin and publishing
+
+- Add project, developer, and source repository metadata to published POMs.
+- Automate signed releases to Gradle Plugin Portal and Maven Central, with repository-specific retries.
+- Improve Maven Central installation and development documentation. Maven Central availability started with 0.2.1.
+
+### IntelliJ IDEA plugin
+
+- Add the Spotless Bridge plugin icon.
+- Include the published English and Korean setup instructions in the plugin descriptor and update the README links.
+- Update README installation instructions with JetBrains Marketplace links.
+
+No changes to formatting behavior, configuration, or compatibility requirements.
+
+### Upgrading from 0.2.1
+
+Change the Bridge Gradle plugin version to `0.2.2`. If you use IntelliJ IDEA, update the IDE plugin to `0.2.2`
+from JetBrains Marketplace. Existing Spotless rules, AI hook commands, and IDE settings remain unchanged.
+
 ## [0.2.1] - 2026-10-16
 
 - Update the Gradle Plugin Portal description, tags and website link. No change to plugin behavior.
@@ -56,6 +77,8 @@ The launcher appears after the next Gradle run, and its first call prepares the 
 Initial GitHub release with the Gradle plugin, the IntelliJ adapter, and a Python AI hook script.
 It was not published to the Gradle Plugin Portal.
 
+[0.2.2]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.2
+[0.2.1]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.2.0
 [0.1.1]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.1.1
 [0.1.0]: https://github.com/pozafly/spotless-bridge/releases/tag/v0.1.0
