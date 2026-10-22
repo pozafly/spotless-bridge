@@ -152,13 +152,21 @@ daemon 종료는 worker와 JVM의 실제 종료까지 기다려 Windows의 JAR �
 Linux는 musl로 정적 링크합니다. CI는 여섯 플랫폼의 CLI를 포함한 JAR로 JDK·Gradle 매트릭스를 검사합니다.
 플랫폼별 검사 결과는 해당 CI 실행에서 확인합니다.
 
-## Plugin Portal·Maven Central 릴리스
+## Plugin Portal·Maven Central·JetBrains Marketplace 릴리스
 
-`release.yml`은 `v<version>` 태그를 push하면 네이티브 클라이언트 여섯 개를 빌드하고,
-`check engineDist` 검증과 서명 ZIP 생성을 마친 뒤 Plugin Portal, Maven Central 순서로 배포합니다.
-같은 작업 디렉터리의 구현 JAR와 plugin marker를 사용합니다. Central은 공식 Publisher API의
-`AUTOMATIC` 방식으로 업로드하며, `PUBLISHED`까지 확인한 후 GitHub Release를 생성합니다.
-서명 ZIP은 `central-bundle-<version>` Actions artifact에도 보관합니다.
+`release.yml`은 `v<version>` 태그를 push하면 먼저 버전과 필요한 Secret을 검사합니다.
+이어서 같은 태그의 `verify.yml`을 호출해 네이티브 클라이언트 여섯 개, Gradle/JDK 조합,
+IntelliJ 테스트와 여섯 IDE 버전의 호환성을 검증합니다. 모든 검사가 성공해야 배포를 시작합니다.
+
+Plugin Portal → Maven Central → JetBrains Marketplace 순서로 배포합니다.
+Central은 서명한 구현 JAR와 plugin marker를 `AUTOMATIC` 방식으로 업로드하고 `PUBLISHED`까지 확인합니다.
+Marketplace에는 모든 IDE 검사를 통과한 동일한 ZIP을 Stable 채널로 업로드하며, 다시 빌드하지 않습니다.
+업로드 성공은 JetBrains 승인·공개 완료와 다릅니다. 승인 상태는 Marketplace의 Versions에서 확인하세요.
+
+성공 후 GitHub Release를 생성·갱신하고 IntelliJ ZIP을 첨부합니다.
+서명 ZIP은 `central-bundle-<version>`, IntelliJ ZIP은 `spotless-bridge-intellij-zip` Actions artifact에도 보관합니다.
+`build/`의 ZIP은 Git에 커밋하지 않습니다. `.gitignore`는 이미 추적 중인 파일에는 적용되지 않으므로,
+기존 파일을 제외할 때는 `git rm --cached <파일>`로 로컬 파일을 유지한 채 추적만 해제합니다.
 
 처음 한 번 저장소의 **Settings → Secrets and variables → Actions → New repository secret**에 등록하세요.
 
@@ -168,12 +176,30 @@ Linux는 musl로 정적 링크합니다. CI는 여섯 플랫폼의 CLI를 포함
 | `GRADLE_PUBLISH_SECRET` | 기존 Plugin Portal API secret |
 | `MAVEN_CENTRAL_USERNAME` | Central에서 생성한 User Token의 username |
 | `MAVEN_CENTRAL_PASSWORD` | 같은 User Token의 password |
+| `JETBRAINS_MARKETPLACE_TOKEN` | Spotless Bridge 업로드 권한이 있는 계정의 Marketplace permanent token |
 | `SIGNING_KEY` | `-----BEGIN PGP PRIVATE KEY BLOCK-----`부터 끝 줄까지 포함한 ASCII-armored 개인키 전체 |
 | `SIGNING_PASSWORD` | 개인키 암호 |
 
 Central 로그인 이메일·비밀번호가 아니라 [User Token](https://central.sonatype.com/usertoken)을 사용합니다.
 개인키는 `gpg --armor --export-secret-keys <전체 지문>`으로 내보낸 내용을 등록합니다.
 공개키는 Central이 지원하는 키 서버에 미리 등록해야 합니다. 개인키나 암호를 저장소 파일에 넣지 않습니다.
+
+### Marketplace 토큰 발급과 GitHub 등록
+
+1. Spotless Bridge 소유자 또는 업로드 권한이 있는 계정으로 [JetBrains Marketplace](https://plugins.jetbrains.com/)에 로그인합니다.
+2. 프로필의 [My Tokens](https://plugins.jetbrains.com/author/me/tokens)에서 permanent token을 생성합니다.
+   이름은 예를 들어 `spotless-bridge-github-actions`로 지정합니다.
+3. [저장소 Actions secrets](https://github.com/pozafly/spotless-bridge/settings/secrets/actions)에서
+   **New repository secret**을 선택합니다.
+4. Name은 **`JETBRAINS_MARKETPLACE_TOKEN`**, Secret은 발급받은 토큰 전체를 입력하고 저장합니다.
+   `Bearer ` 접두사는 붙이지 않습니다. 워크플로에서 추가합니다.
+
+토큰은 채팅이나 저장소 파일에 적지 않고 GitHub Secret에 직접 등록합니다.
+[JetBrains 공식 업로드 API 안내](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html)를 참고하세요.
+토큰이 없는 상태에서 전체 배포를 요청하면 다른 저장소에 배포하기 전에 중단합니다.
+검증 전용 실행에는 Marketplace 토큰이 필요하지 않습니다.
+
+### 태그 배포와 실패 복구
 
 릴리스할 때는 `gradle.properties`, `native/Cargo.toml`, `native/Cargo.lock`의 버전을 맞추고 `CHANGELOG.md`에 해당 버전의
 변경 내역을 작성합니다. 배포 전에는 `Unreleased`로 두고, 실제 릴리스할 때 배포 날짜로 바꿉니다.
@@ -182,24 +208,41 @@ IntelliJ 업데이트 노트는 `src/idea/resources/META-INF/plugin.xml`의 `cha
 예를 들어 다음 새 버전은 아래처럼 배포합니다.
 
 ```sh
-git tag v0.2.2
-git push origin v0.2.2
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
-태그 push는 양쪽 저장소에 실제 공개 배포합니다. 이미 공개된 버전의 태그를 옮기거나 같은 버전을 덮어쓰지 않습니다.
-수동 `Run workflow`는 `publish=false`가 기본이며, 검증·서명 ZIP 생성과 Plugin Portal의 `--validate-only`만
-수행합니다. Central 업로드나 공개 배포는 하지 않으며 Central 서버의 인증·검증을 확인하는 것도 아닙니다.
+태그 push의 기본 대상은 `all`입니다. 세 곳에 실제 배포·업로드하며, 이미 공개된 태그를 옮기거나
+같은 버전을 덮어쓰지 않습니다. 이 자동화가 포함된 새 커밋에 다음 버전 태그를 붙여야 합니다.
+기존 `v0.2.2` 태그는 당시 워크플로를 실행하므로 이 자동화가 적용되지 않습니다.
 
-두 저장소의 배포는 하나의 트랜잭션이 아닙니다. 한쪽만 성공하면 해당 버전 태그에서 실패한 저장소만 재실행하세요.
-예를 들어 Plugin Portal은 성공하고 Central만 실패했다면:
+수동 `Run workflow`는 `publish=false`가 기본입니다. 전체 검증 후 선택한 대상의 패키지를 준비하며,
+Plugin Portal 대상은 `--validate-only`를 실행합니다. Central·Marketplace 업로드와 GitHub Release 생성은 하지 않습니다.
+검증 모드는 외부 서버의 업로드 인증이나 승인까지 확인하지 않습니다.
+
+`repository`는 다음 중 하나를 선택합니다.
+
+| 값 | 대상 |
+| --- | --- |
+| `all` | 세 곳 전체 |
+| `plugin-portal` | Gradle Plugin Portal만 |
+| `maven-central` | Maven Central만 |
+| `jetbrains-marketplace` | IntelliJ Marketplace만 |
+
+세 곳의 배포는 하나의 트랜잭션이 아닙니다. 일부만 성공하면 같은 태그에서 실패한 대상만 재실행하세요.
+예를 들어 Gradle 쪽 배포는 성공하고 Marketplace 업로드만 실패했다면:
 
 ```sh
-gh workflow run release.yml --ref v0.2.2 -f publish=true -f repository=maven-central
+gh workflow run release.yml --ref v0.2.3 -f publish=true -f repository=jetbrains-marketplace
 ```
 
-반대의 경우 `repository=plugin-portal`을 사용합니다. 재실행 전에 이미 성공한 쪽의 상태를 확인하세요.
-네트워크 오류나 시간 초과라면 Central에 업로드가 접수되었거나 계속 배포 중일 수 있으므로,
-Actions 로그·요약의 deployment ID와 [Central Portal](https://central.sonatype.com/publishing)을 먼저 확인합니다.
-`PUBLISHED`인 버전을 다시 올리지 않습니다. 복구 실행이 성공하면 GitHub Release도 생성하거나 갱신합니다.
+Central만 실패했다면 `repository=maven-central`, Plugin Portal만 실패했다면 `repository=plugin-portal`을 사용합니다.
+Marketplace만 재실행할 때는 Marketplace 토큰만 필요하며 Central·Plugin Portal 인증 정보나 서명키는 필요하지 않습니다.
+각 재실행도 전체 검증을 거칩니다. GitHub Release는 선택한 대상의 배포 성공 후 생성·갱신합니다.
 
-API 인증·업로드·상태 값은 [Central 공식 API 문서](https://central.sonatype.org/publish/publish-portal-api/)를 따릅니다.
+네트워크 오류나 시간 초과로 업로드 결과가 불명확하면 자동으로 재업로드하지 않습니다.
+Central은 Actions 로그·요약의 deployment ID로 [Central Portal](https://central.sonatype.com/publishing)을 확인합니다.
+Marketplace는 [Versions](https://plugins.jetbrains.com/plugin/35218-spotless-bridge/versions)에서 승인 대기 중인 버전도 확인합니다.
+이미 접수되었거나 게시된 버전을 다시 올리지 마세요.
+
+Central API는 [공식 API 문서](https://central.sonatype.org/publish/publish-portal-api/)를 따릅니다.

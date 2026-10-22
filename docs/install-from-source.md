@@ -116,7 +116,8 @@ Warnings stay visible; no APIs are accessed through reflection to hide compatibi
 
 CI builds the ZIP once, then six verifier jobs download the same artifact and check its SHA-256 before
 and after verification. SDK downloads are also hash-checked. The existing 11 engine jobs remain independent
-of IDE SDKs. The CI does not publish to Marketplace.
+of IDE SDKs. The verification workflow does not publish. Tag releases reuse these checks and upload the verified
+ZIP to Marketplace; see the [release guide (Korean)](maintenance.md).
 
 Safe Mode blocks formatting, including cached clients. Trust must be granted through IntelliJ's UI.
 The regression tests mock the trust response. Binary verification does not replace testing actual Safe Mode,

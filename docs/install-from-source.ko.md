@@ -115,7 +115,8 @@ JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
 2025.3에는 없어 호환성을 위해 기존 API를 유지하며, 경고를 숨기거나 리플렉션으로 우회하지 않습니다.
 
 CI는 ZIP을 한 번 빌드하고 여섯 Verifier job이 같은 artifact를 받아 검사 전후 SHA-256을 확인합니다.
-SDK 다운로드 해시도 확인합니다. 기존 엔진 11개 job은 SDK 없이 실행하며 Marketplace에 자동 게시하지 않습니다.
+SDK 다운로드 해시도 확인합니다. 기존 엔진 11개 job은 SDK 없이 실행합니다. 검증 워크플로 자체는 배포하지 않으며,
+태그 릴리스가 이 검증을 재사용한 뒤 검증한 ZIP을 Marketplace에 업로드합니다. [릴리스 안내](maintenance.md)를 참고하세요.
 
 Safe Mode에서는 캐시된 연결을 포함한 포맷 요청을 차단합니다. 신뢰는 사용자가 IntelliJ UI에서 부여해야 합니다.
 회귀 테스트는 신뢰 응답을 모킹합니다. 바이너리 검증은 실제 IDE의 Safe Mode·Reformat Code·저장 동작·

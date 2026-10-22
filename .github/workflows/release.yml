@@ -1,5 +1,5 @@
-name: Release to Plugin Portal and Maven Central
-# A version tag publishes to both repositories and creates the GitHub Release.
+name: Release to Plugin Portal, Maven Central and JetBrains Marketplace
+# A version tag publishes to all three destinations after verification.
 # Manual runs validate locally by default; publishing requires an existing version tag.
 on:
   push:
@@ -7,46 +7,38 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish the selected repositories (otherwise validate and build the signed ZIP only)"
+        description: "Publish the selected destination (otherwise validate and build only)"
         type: boolean
         default: false
       repository:
         description: "Select one repository to recover a partially completed release"
         type: choice
-        options: [both, plugin-portal, maven-central]
-        default: both
+        options: [all, plugin-portal, maven-central, jetbrains-marketplace]
+        default: all
 permissions:
   contents: write
 concurrency:
   group: release
   cancel-in-progress: false
 jobs:
-  native-clients:
-    uses: ./.github/workflows/native.yml
-  publish:
-    needs: native-clients
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.config.outputs.version }}
     env:
       PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
-      RELEASE_REPOSITORY: ${{ inputs.repository || 'both' }}
+      RELEASE_REPOSITORY: ${{ inputs.repository || 'all' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: native-*
-          merge-multiple: true
-          path: build/native
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
       - name: Check release configuration
+        id: config
         env:
           GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
           GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
@@ -55,12 +47,24 @@ jobs:
             echo "Publishing requires the v$version tag; select that tag for a manual retry." >&2
             exit 1
           fi
-          required=(SIGNING_KEY SIGNING_PASSWORD)
-          if [ "$RELEASE_REPOSITORY" != "maven-central" ]; then
+          case "$RELEASE_REPOSITORY" in
+            all|plugin-portal|maven-central|jetbrains-marketplace) ;;
+            *) echo "Unknown release destination: $RELEASE_REPOSITORY" >&2; exit 1 ;;
+          esac
+          required=()
+          if [ "$RELEASE_REPOSITORY" != "jetbrains-marketplace" ]; then
+            required+=(SIGNING_KEY SIGNING_PASSWORD)
+          fi
+          if [ "$RELEASE_REPOSITORY" = "all" ] || [ "$RELEASE_REPOSITORY" = "plugin-portal" ]; then
             required+=(GRADLE_PUBLISH_KEY GRADLE_PUBLISH_SECRET)
           fi
-          if [ "$PUBLISH" = "true" ] && [ "$RELEASE_REPOSITORY" != "plugin-portal" ]; then
-            required+=(MAVEN_CENTRAL_USERNAME MAVEN_CENTRAL_PASSWORD)
+          if [ "$PUBLISH" = "true" ]; then
+            if [ "$RELEASE_REPOSITORY" = "all" ] || [ "$RELEASE_REPOSITORY" = "maven-central" ]; then
+              required+=(MAVEN_CENTRAL_USERNAME MAVEN_CENTRAL_PASSWORD)
+            fi
+            if [ "$RELEASE_REPOSITORY" = "all" ] || [ "$RELEASE_REPOSITORY" = "jetbrains-marketplace" ]; then
+              required+=(JETBRAINS_MARKETPLACE_TOKEN)
+            fi
           fi
           for name in "${required[@]}"; do
             if [ -z "${!name}" ]; then
@@ -68,7 +72,45 @@ jobs:
               exit 1
             fi
           done
-          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+  verify:
+    needs: prepare
+    uses: ./.github/workflows/verify.yml
+    permissions:
+      contents: read
+  publish:
+    needs: [prepare, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+      RELEASE_REPOSITORY: ${{ inputs.repository || 'all' }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        if: env.RELEASE_REPOSITORY != 'jetbrains-marketplace'
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: build/native
+      - uses: actions/setup-java@v4
+        if: env.RELEASE_REPOSITORY != 'jetbrains-marketplace'
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Download verified IntelliJ ZIP
+        if: env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'jetbrains-marketplace'
+        uses: actions/download-artifact@v4
+        with:
+          name: spotless-bridge-intellij-zip
+          path: build/distributions/
+      - name: Check verified IntelliJ ZIP
+        if: env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'jetbrains-marketplace'
+        run: |
+          cd build/distributions
+          sha256sum --check SHA256SUMS
+          test -s "spotless-bridge-$RELEASE_VERSION.zip"
       - name: Extract release notes from CHANGELOG.md
         if: env.PUBLISH == 'true'
         run: |
@@ -81,20 +123,20 @@ jobs:
             echo "CHANGELOG.md has no section for [$RELEASE_VERSION]" >&2
             exit 1
           fi
-      - name: Verify
-        run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native check engineDist
       - name: Build signed Central bundle
+        if: env.RELEASE_REPOSITORY != 'jetbrains-marketplace'
         env:
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native -PcentralPublishing=true centralBundle
       - uses: actions/upload-artifact@v4
+        if: env.RELEASE_REPOSITORY != 'jetbrains-marketplace'
         with:
           name: central-bundle-${{ env.RELEASE_VERSION }}
           path: build/distributions/spotless-bridge-${{ env.RELEASE_VERSION }}-central.zip
           if-no-files-found: error
       - name: Validate or publish to Plugin Portal
-        if: env.RELEASE_REPOSITORY != 'maven-central'
+        if: env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'plugin-portal'
         env:
           GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
           GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
@@ -107,7 +149,7 @@ jobs:
           fi
           ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native -PcentralPublishing=true publishPlugins "${args[@]}"
       - name: Publish to Maven Central and wait for completion
-        if: env.PUBLISH == 'true' && env.RELEASE_REPOSITORY != 'plugin-portal'
+        if: env.PUBLISH == 'true' && (env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'maven-central')
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -149,6 +191,23 @@ jobs:
           done
           echo "Timed out waiting for Central. Check deployment $deployment in the Portal before retrying; publication may still finish." >&2
           exit 1
+      - name: Upload to JetBrains Marketplace
+        if: env.PUBLISH == 'true' && (env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'jetbrains-marketplace')
+        env:
+          JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+        run: |
+          # Upload the exact ZIP that passed every IDE check. Do not rebuild or retry an ambiguous upload.
+          if ! curl --fail-with-body --silent --show-error --connect-timeout 20 --max-time 180 \
+            --header "Authorization: Bearer $JETBRAINS_MARKETPLACE_TOKEN" \
+            --form "pluginId=35218" \
+            --form "file=@build/distributions/spotless-bridge-$RELEASE_VERSION.zip;type=application/zip" \
+            --output "$RUNNER_TEMP/jetbrains-upload-response.json" \
+            https://plugins.jetbrains.com/api/updates/upload; then
+            echo "Marketplace upload failed or its outcome is unknown. Check the plugin's Versions page before retrying." >&2
+            exit 1
+          fi
+          echo "JetBrains Marketplace: upload accepted; review status is separate from upload success."
+          echo "JetBrains Marketplace: $RELEASE_VERSION uploaded to Stable. Check [review status](https://plugins.jetbrains.com/plugin/35218-spotless-bridge/versions)." >> "$GITHUB_STEP_SUMMARY"
       - name: Create GitHub Release
         if: env.PUBLISH == 'true'
         env:
@@ -159,4 +218,7 @@ jobs:
             gh release edit "$GITHUB_REF_NAME" --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
           else
             gh release create "$GITHUB_REF_NAME" --verify-tag --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          if [ "$RELEASE_REPOSITORY" = "all" ] || [ "$RELEASE_REPOSITORY" = "jetbrains-marketplace" ]; then
+            gh release upload "$GITHUB_REF_NAME" "build/distributions/spotless-bridge-$RELEASE_VERSION.zip" --clobber
           fi
