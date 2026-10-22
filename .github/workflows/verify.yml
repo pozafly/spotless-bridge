@@ -34,7 +34,7 @@ jobs:
             java: "21"
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: native-*
           merge-multiple: true
@@ -70,7 +70,7 @@ jobs:
       versions: ${{ steps.targets.outputs.versions }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: native-*
           merge-multiple: true
@@ -130,7 +130,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: spotless-bridge-intellij-zip
           path: build/distributions/
