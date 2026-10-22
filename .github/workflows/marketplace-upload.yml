@@ -1,0 +1,62 @@
+name: Upload verified IntelliJ ZIP to Marketplace
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing release version, without v (for example 0.2.2)"
+        type: string
+        required: true
+      verification_run_id:
+        description: "Successful Spotless Bridge verification run on main containing the ZIP"
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      VERIFICATION_RUN_ID: ${{ inputs.verification_run_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify source run and release tag
+        run: |
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release version" >&2; exit 1; }
+          [[ "$VERIFICATION_RUN_ID" =~ ^[0-9]+$ ]] || { echo "Invalid verification run ID" >&2; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFICATION_RUN_ID" > "$RUNNER_TEMP/verification-run.json"
+          sha=$(jq -er --arg repo "$GITHUB_REPOSITORY" '
+            select(.status == "completed" and .conclusion == "success"
+              and .path == ".github/workflows/verify.yml"
+              and .head_repository.full_name == $repo and .head_branch == "main"
+              and (.event == "push" or .event == "workflow_dispatch")) | .head_sha
+          ' "$RUNNER_TEMP/verification-run.json")
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid verification commit" >&2; exit 1; }
+          tag="refs/tags/v$RELEASE_VERSION"
+          git rev-parse --verify "$tag^{commit}"
+          version=$(git show "$sha:gradle.properties" | sed -n 's/^version=//p')
+          test "$version" = "$RELEASE_VERSION"
+          # CI/docs may change after a release; plugin source and build inputs must match its tag.
+          git diff --exit-code "$tag" "$sha" -- src native gradle gradlew gradlew.bat build.gradle settings.gradle gradle.properties
+          echo "Verified run $VERIFICATION_RUN_ID at $sha matches v$RELEASE_VERSION plugin sources."
+      - name: Download verified IntelliJ ZIP
+        run: |
+          gh run download "$VERIFICATION_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name spotless-bridge-intellij-zip --dir "$RUNNER_TEMP/marketplace-upload"
+      - name: Verify downloaded ZIP
+        run: |
+          cd "$RUNNER_TEMP/marketplace-upload"
+          sha256sum --check SHA256SUMS
+          test -s "spotless-bridge-$RELEASE_VERSION.zip"
+      - name: Upload to JetBrains Marketplace
+        env:
+          JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+        run: bash scripts/upload-marketplace.sh "$RUNNER_TEMP/marketplace-upload/spotless-bridge-$RELEASE_VERSION.zip"

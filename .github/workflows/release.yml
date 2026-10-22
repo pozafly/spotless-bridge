@@ -195,19 +195,7 @@ jobs:
         if: env.PUBLISH == 'true' && (env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'jetbrains-marketplace')
         env:
           JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
-        run: |
-          # Upload the exact ZIP that passed every IDE check. Do not rebuild or retry an ambiguous upload.
-          if ! curl --fail-with-body --silent --show-error --connect-timeout 20 --max-time 180 \
-            --header "Authorization: Bearer $JETBRAINS_MARKETPLACE_TOKEN" \
-            --form "pluginId=35218" \
-            --form "file=@build/distributions/spotless-bridge-$RELEASE_VERSION.zip;type=application/zip" \
-            --output "$RUNNER_TEMP/jetbrains-upload-response.json" \
-            https://plugins.jetbrains.com/api/updates/upload; then
-            echo "Marketplace upload failed or its outcome is unknown. Check the plugin's Versions page before retrying." >&2
-            exit 1
-          fi
-          echo "JetBrains Marketplace: upload accepted; review status is separate from upload success."
-          echo "JetBrains Marketplace: $RELEASE_VERSION uploaded to Stable. Check [review status](https://plugins.jetbrains.com/plugin/35218-spotless-bridge/versions)." >> "$GITHUB_STEP_SUMMARY"
+        run: bash scripts/upload-marketplace.sh "build/distributions/spotless-bridge-$RELEASE_VERSION.zip"
       - name: Create GitHub Release
         if: env.PUBLISH == 'true'
         env:

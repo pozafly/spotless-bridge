@@ -246,3 +246,18 @@ Marketplace는 [Versions](https://plugins.jetbrains.com/plugin/35218-spotless-br
 이미 접수되었거나 게시된 버전을 다시 올리지 마세요.
 
 Central API는 [공식 API 문서](https://central.sonatype.org/publish/publish-portal-api/)를 따릅니다.
+
+### 기존 릴리스의 IntelliJ ZIP만 업로드
+
+자동 업로드가 없던 이전 태그의 IntelliJ 버전은 `marketplace-upload.yml`을 `main`에서 수동 실행합니다.
+전체 성공한 `verify.yml` 실행 ID와 버전을 지정합니다. 해당 실행은 이 저장소의 `main`에서 실행된 것이어야 하며,
+플러그인 소스·빌드 설정이 기존 버전 태그와 일치해야 합니다. 체크섬을 확인한 뒤 저장된 ZIP만 업로드합니다.
+새 버전 생성, 태그 변경, Gradle·Central 재배포는 하지 않습니다. 토큰은 같은 `JETBRAINS_MARKETPLACE_TOKEN`을 사용합니다.
+
+```sh
+gh workflow run marketplace-upload.yml --ref main \
+  -f version=0.2.2 -f verification_run_id=<성공한-verification-run-ID>
+```
+
+실행 전에 Marketplace Versions에서 승인 대기 중인 동일 버전이 없는지 확인하세요.
+네트워크 오류로 결과가 불명확한 경우에도 접수 여부를 확인한 뒤 재시도합니다.
