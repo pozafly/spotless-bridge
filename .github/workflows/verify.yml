@@ -55,7 +55,7 @@ jobs:
         env:
           TEST_JAVA_HOME: ${{ steps.consumer-java.outputs.path }}
         run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native check engineDist -PtestGradleVersion=${{ matrix.gradle }} -PtestJavaHome="$TEST_JAVA_HOME"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: spotless-bridge-engine-${{ matrix.os || 'ubuntu-latest' }}-gradle-${{ matrix.gradle }}-jdk-${{ matrix.java }}
           path: build/engine/
@@ -100,14 +100,14 @@ jobs:
           ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native ideaTest pluginZip -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
           cd build/distributions
           sha256sum "spotless-bridge-$PLUGIN_VERSION.zip" > SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: spotless-bridge-intellij-zip
           path: |
             build/distributions/spotless-bridge-${{ env.PLUGIN_VERSION }}.zip
             build/distributions/SHA256SUMS
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: spotless-bridge-intellij-tests
@@ -155,7 +155,7 @@ jobs:
           ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native verifyIdeaPlugin \
             -PideaPluginZip="$zip" -PideaVerifyVersion="$IDEA_VERSION" -PideaSdkRoot="$RUNNER_TEMP/idea-sdks"
           (cd build/distributions && sha256sum --check SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: spotless-bridge-intellij-verification-${{ matrix.idea }}

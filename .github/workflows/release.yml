@@ -129,7 +129,7 @@ jobs:
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew --no-daemon --console=plain -PnativeCliDirectory=build/native -PcentralPublishing=true centralBundle
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.RELEASE_REPOSITORY != 'jetbrains-marketplace'
         with:
           name: central-bundle-${{ env.RELEASE_VERSION }}
