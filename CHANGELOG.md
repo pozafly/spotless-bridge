@@ -16,6 +16,10 @@ All notable changes to Spotless Bridge are documented here.
 - Expand the English and Korean setup instructions and IDE change notes.
 - Verify the identical 0.2.3 ZIP on all seven pinned IDE builds: `Compatible`, zero deprecated API usages; all six IDE regression tests pass.
 
+### CI
+
+- Move the native macOS ARM64 build to the supported `macos-15` runner after macOS 14 retirement.
+
 ## [0.2.2] - 2026-10-22
 
 ### Gradle plugin and publishing
