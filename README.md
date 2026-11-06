@@ -57,11 +57,11 @@ Add Spotless Bridge to the `plugins` block of your **root** `build.gradle`, next
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // your existing Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.2.2'
+    id 'io.github.pozafly.spotlessbridge' version '0.2.3'
 }
 ```
 
-In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.2.2"`.
+In Kotlin DSL, add `id("io.github.pozafly.spotlessbridge") version "0.2.3"`.
 Keep your existing Spotless version and rules. In a multi-project build, apply Bridge once at the root
 and leave each module's Spotless configuration as it is.
 
@@ -170,12 +170,12 @@ or open **Settings → Plugins → Marketplace** in IntelliJ IDEA, search for **
 Restart the IDE if prompted. You can also
 [build and install it from source](docs/install-from-source.md#2-build-and-install-the-intellij-plugin).
 
-It supports IntelliJ IDEA **2025.3–2026.2**; see the
+Version **0.2.3** supports IntelliJ IDEA **2025.3–2026.3**; see the
 [verified versions](docs/install-from-source.md#verify-the-same-zip-across-ide-versions-without-publishing).
 
 **The IDE plugin requires project setup too.** Your project needs its Gradle wrapper,
 Gradle **8.14.3 or newer (below 10.0)**, Spotless **8.x** with Java formatting configured, and the
-`io.github.pozafly.spotlessbridge` Gradle plugin **0.2.2** applied at the root.
+`io.github.pozafly.spotlessbridge` Gradle plugin **0.2.3** applied at the root.
 Follow [Quick start, step 1](#1-apply-the-plugin) for Groovy and Kotlin DSL, then sync Gradle.
 Keep each module's existing Spotless configuration. You do not need to configure an AI hook to use the IDE plugin.
 

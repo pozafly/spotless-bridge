@@ -57,11 +57,11 @@ Spotless Java 포맷이 설정된 Gradle 프로젝트와 해당 프로젝트의 
 ```groovy
 plugins {
     id 'com.diffplug.spotless' version '8.10.2'   // 기존 Spotless
-    id 'io.github.pozafly.spotlessbridge' version '0.2.2'
+    id 'io.github.pozafly.spotlessbridge' version '0.2.3'
 }
 ```
 
-Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.2.2"`을 추가합니다.
+Kotlin DSL에서는 `id("io.github.pozafly.spotlessbridge") version "0.2.3"`을 추가합니다.
 기존 Spotless 버전과 규칙은 그대로 두세요. 멀티 프로젝트 빌드라면 Bridge는 루트에 한 번만 적용하고,
 각 모듈의 Spotless 설정은 건드리지 않아도 됩니다.
 
@@ -169,12 +169,12 @@ IntelliJ IDEA의 **Settings → Plugins → Marketplace**에서 **Spotless Bridg
 재시작 안내가 나오면 IDE를 재시작하세요.
 [소스에서 빌드해 설치](docs/install-from-source.ko.md#2-intellij-플러그인-빌드와-설치)할 수도 있습니다.
 
-지원 버전은 IntelliJ IDEA **2025.3~2026.2**이며,
+**0.2.3**의 지원 버전은 IntelliJ IDEA **2025.3~2026.3**이며,
 [검증한 버전 목록](docs/install-from-source.ko.md#게시-없이-동일-zip으로-여러-ide-검증)을 참고하세요.
 
 **IDE 플러그인 설치 외에 프로젝트 설정도 필요합니다.** 프로젝트에 Gradle wrapper,
 **8.14.3 이상·10.0 미만의 Gradle**, Java 포맷 규칙을 설정한 **Spotless 8.x**가 있어야 하며,
-루트 프로젝트에 `io.github.pozafly.spotlessbridge` Gradle 플러그인 **0.2.2**를 적용해야 합니다.
+루트 프로젝트에 `io.github.pozafly.spotlessbridge` Gradle 플러그인 **0.2.3**를 적용해야 합니다.
 [빠른 시작의 플러그인 적용 단계](#1-플러그인-적용)에서 Groovy/Kotlin DSL 예시를 참고한 뒤 Gradle을 동기화하세요.
 각 모듈의 기존 Spotless 설정은 유지합니다. IDE 플러그인만 사용할 때는 AI hook 설정이 필요하지 않습니다.
 

@@ -3,7 +3,7 @@
 [English](install-from-source.md) | 한국어
 
 IntelliJ 플러그인을 소스에서 빌드하거나 Bridge 자체를 개발할 때 참고하는 문서입니다.
-Gradle 플러그인 0.2.2는 Gradle Plugin Portal에서 사용할 수 있으므로, IDE 사용자는 1단계의 로컬 저장소 게시 없이
+Gradle 플러그인 0.2.3은 Gradle Plugin Portal에서 사용할 수 있으므로, IDE 사용자는 1단계의 로컬 저장소 게시 없이
 공개된 Gradle 플러그인을 사용할 수 있습니다. 일반적인 사용법은 [README](../README.ko.md)를 참고하세요.
 
 Spotless Bridge 소스 디렉터리와 **JDK 21**이 필요합니다. 예시에서는 다음 경로를 실제 위치로 바꿔 사용하세요.
@@ -16,7 +16,7 @@ Spotless Bridge 소스 디렉터리와 **JDK 21**이 필요합니다. 예시에�
 소스에서 빌드할 때는 rustup으로 Rust를 준비합니다. `native/rust-toolchain.toml`에 Rust 1.90.0이 고정되어 있고,
 Gradle 리소스 처리 시 Cargo가 현재 컴퓨터용 CLI를 빌드합니다. 외부 crate 의존성은 없습니다.
 이 요구사항은 Bridge 개발자에게만 해당합니다. 게시된 플러그인을 사용하는 사람은 Rust를 설치하지 않습니다.
-이 체크아웃의 로컬 저장소를 사용할 소비 프로젝트에서는 버전을 `0.2.2`로 지정하세요.
+이 체크아웃의 로컬 저장소를 사용할 소비 프로젝트에서는 버전을 `0.2.3`로 지정하세요.
 
 ```sh
 ./gradlew testNativeCli nativeSmokeTest
@@ -56,7 +56,7 @@ Plugin Portal에 배포된 뒤에는 로컬 `maven` 항목을 제거하세요.
 
 ## 2. IntelliJ 플러그인 빌드와 설치
 
-`gradle.properties`의 `version=0.2.2`는 Gradle 플러그인, 네이티브 클라이언트와 IntelliJ 플러그인의 공통 버전입니다.
+`gradle.properties`의 `version=0.2.3`는 Gradle 플러그인, 네이티브 클라이언트와 IntelliJ 플러그인의 공통 버전입니다.
 릴리스 워크플로도 이 버전으로 검증된 IntelliJ ZIP을 찾습니다.
 
 최소 지원 IDE인 **2025.3 (IU-253.28294.334)** SDK와 JDK 21로 빌드합니다.
@@ -75,15 +75,15 @@ JAVA_HOME=/path/to/jdk21 ./gradlew ideaTest pluginZip -PideaSdkRoot=/path/to/sdk
 빌드에는 2025.3 SDK만 필요합니다. `-PideaHome=/path/to/IDE`로 빌드 SDK 위치를 바꿀 수 있으며,
 macOS IDE는 `Contents` 경로를 사용합니다. 제품·버전·빌드가 다르면 `verifyIdeaSdk`가 중단합니다.
 adapter 바이트코드는 Java 21, 엔진은 Java 17입니다.
-ZIP 설치 허용 범위는 `253.28294.334`부터 `262.*`까지로, 2025.3~2026.2를 대상으로 합니다.
+ZIP 설치 허용 범위는 `253.28294.334`부터 `263.*`까지로, 2025.3~2026.3을 대상으로 합니다.
 
 IntelliJ의 **Settings → Plugins → 톱니바퀴 → Install Plugin from Disk…**에서
-`build/distributions/spotless-bridge-0.2.2.zip`을 선택하세요. 이전 개발판이 있다면 먼저 비활성화하거나 제거합니다.
+`build/distributions/spotless-bridge-0.2.3.zip`을 선택하세요. 이전 개발판이 있다면 먼저 비활성화하거나 제거합니다.
 이후 [IntelliJ IDEA 설정](../README.ko.md#intellij-idea)을 따릅니다.
 
 ### 게시 없이 동일 ZIP으로 여러 IDE 검증
 
-고정한 SDK 여섯 개를 SDK 루트에 준비하고 실행합니다.
+고정한 SDK 일곱 개를 SDK 루트에 준비하고 실행합니다.
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-root
@@ -100,18 +100,24 @@ Safe Mode와 포맷 결과 보호 회귀 테스트 후 2025.3으로 ZIP을 한 �
 | 2026.1.5      | `261.27258.48`  |
 | 2026.2        | `262.8665.258`  |
 | 2026.2.3      | `262.10968.63`  |
+| 2026.3        | `263.7307.200`  |
 
-2026년 10월 17일, 버전을 0.2.2로 지정한 로컬 출시 준비 빌드는 위 여섯 검사에서 모두 `Compatible`, deprecated API 사용 0건을 확인했습니다.
-Safe Mode와 포맷 결과 보호 테스트 6개도 모두 통과했습니다.
-검증한 ZIP의 SHA-256은 `56a99636df9a18e13357e70714be0ee19c2ee4dcf036290c5dae202a69b4520c`입니다.
-이는 정식 0.2.2 출시 및 현재 변경 통합 이전의 기록으로, 위 해시와 결과는 현재 ZIP의 검증 결과가 아닙니다.
-당시 빌드는 업로드하거나 각 IDE에서 수동 실행 검사하지 않았습니다. 현재 빌드는 다시 검증해야 합니다.
+2026년 11월 6일, IntelliJ 플러그인 0.2.3의 동일 ZIP으로 위 일곱 검사를 모두 통과했습니다.
+모든 판정은 `Compatible`이며 deprecated API 사용은 0건입니다. Safe Mode와 포맷 결과 보호 테스트 6개도 통과했습니다.
+검증한 ZIP의 SHA-256은 `362fccaf5b69343f553b7885acef077f9ac2199998e2a2ffa4dcb8b1ad7a78e0`입니다.
+보고서는 `build/reports/plugin-verifier/`에 있으며 `plugin-sha256.txt`에서 검증한 ZIP을 확인할 수 있습니다.
+이는 자동 바이너리 호환성·회귀 검사 결과입니다. 실제 IDE UI 검사와 Marketplace 업로드·심사는 별도이며,
+이번 IDE 업데이트에서 네이티브 CLI와 엔진 호환성 검사는 다시 실행하지 않았습니다.
+
+Marketplace 버전 0.2.1에서 2026.1.5·2026.2.3에 보고된 deprecated 읽기 API 사용 3곳은
+`Application.runReadAction`으로 교체했습니다. 두 버전 모두 해당 경고 없이 `Compatible`로 판정됐고,
+2026.3에서도 같은 수정을 검증했습니다.
 
 이미 만든 ZIP을 재빌드 없이 특정 버전에서만 검증하려면 다음처럼 실행합니다.
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
-  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.2.zip \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.3.zip \
   -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
 ```
 
@@ -120,7 +126,7 @@ JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
 금지된 API 또는 deprecated API 사용은 실패 처리합니다. 검사 중 ZIP 내용이 바뀌어도 실패합니다.
 공개 API인 `Application.runReadAction`으로 기존 읽기 잠금 동작과 2025.3 호환성을 유지합니다.
 
-CI는 ZIP을 한 번 빌드하고 여섯 Verifier job이 같은 artifact를 받아 검사 전후 SHA-256을 확인합니다.
+CI는 ZIP을 한 번 빌드하고 일곱 Verifier job이 같은 artifact를 받아 검사 전후 SHA-256을 확인합니다.
 SDK 다운로드 해시도 확인합니다. 기존 엔진 11개 job은 SDK 없이 실행합니다. 검증 워크플로 자체는 배포하지 않으며,
 태그 릴리스가 이 검증을 재사용한 뒤 검증한 ZIP을 Marketplace에 업로드합니다. [릴리스 안내](maintenance.md)를 참고하세요.
 

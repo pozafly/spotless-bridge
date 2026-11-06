@@ -3,7 +3,7 @@
 English | [한국어](install-from-source.ko.md)
 
 This guide is for building the IntelliJ plugin from source or working on Bridge itself.
-The Gradle plugin 0.2.2 is available on the Gradle Plugin Portal; IDE users can use that release without
+The Gradle plugin 0.2.3 is available on the Gradle Plugin Portal; IDE users can use that release without
 publishing to a local repository in step 1. For everyday usage, see the [README](../README.md).
 
 You need a Spotless Bridge source checkout and **JDK 21**. The examples use these placeholder paths:
@@ -16,7 +16,7 @@ You need a Spotless Bridge source checkout and **JDK 21**. The examples use thes
 Install Rust via rustup before building from source. `native/rust-toolchain.toml` pins Rust 1.90.0;
 Cargo builds the host CLI automatically when Gradle processes resources. The native client has no external crates.
 This prerequisite applies only to Bridge contributors: users of a published plugin do not install Rust.
-Use version `0.2.2` in your consumer when testing this checkout's local repository.
+Use version `0.2.3` in your consumer when testing this checkout's local repository.
 
 ```sh
 ./gradlew testNativeCli nativeSmokeTest
@@ -55,7 +55,7 @@ Once the plugin is on the Plugin Portal, remove the local `maven` entry.
 
 ## 2. Build and install the IntelliJ plugin
 
-In `gradle.properties`, `version=0.2.2` controls the Gradle plugin, native client and IntelliJ plugin versions.
+In `gradle.properties`, `version=0.2.3` controls the Gradle plugin, native client and IntelliJ plugin versions.
 The release workflow uses this shared version to locate the verified IntelliJ ZIP.
 
 Build with JDK 21 and the **2025.3 (IU-253.28294.334)** SDK, the minimum supported IDE.
@@ -74,15 +74,15 @@ JAVA_HOME=/path/to/jdk21 ./gradlew ideaTest pluginZip -PideaSdkRoot=/path/to/sdk
 Only the 2025.3 SDK is needed to build. `-PideaHome=/path/to/IDE` can override its location
 (use the `Contents` directory for a macOS IDE). `verifyIdeaSdk` rejects any other product, version or build.
 Adapter bytecode is Java 21; the engine remains Java 17.
-The ZIP declares builds `253.28294.334` through `262.*` (2025.3–2026.2).
+The ZIP declares builds `253.28294.334` through `263.*` (2025.3–2026.3).
 
 In IntelliJ, open **Settings → Plugins → gear menu → Install Plugin from Disk…** and select
-`build/distributions/spotless-bridge-0.2.2.zip`. If you installed an earlier development build,
+`build/distributions/spotless-bridge-0.2.3.zip`. If you installed an earlier development build,
 disable or uninstall it first. Then follow [IntelliJ IDEA setup](../README.md#intellij-idea).
 
 ### Verify the same ZIP across IDE versions without publishing
 
-Install all six pinned SDKs under the SDK root, then run:
+Install all seven pinned SDKs under the SDK root, then run:
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin -PideaSdkRoot=/path/to/sdk-root
@@ -99,18 +99,24 @@ Plugin Verifier **1.410** against the first release and pinned latest patch of e
 | 2026.1.5      | `261.27258.48`  |
 | 2026.2        | `262.8665.258`  |
 | 2026.2.3      | `262.10968.63`  |
+| 2026.3        | `263.7307.200`  |
 
-On October 17, 2026, a local pre-release build labeled 0.2.2 passed all six checks above with `Compatible` verdicts and
-zero deprecated API usages. All six Safe Mode and formatting-result guard tests passed.
-The verified ZIP SHA-256 is `56a99636df9a18e13357e70714be0ee19c2ee4dcf036290c5dae202a69b4520c`.
-That historical build predates the published 0.2.2 release and the current integration; its hash and results
-do not describe the current ZIP. It was not uploaded or manually tested in each IDE. Re-run verification for the current build.
+On November 6, 2026, the IntelliJ plugin 0.2.3 ZIP passed all seven checks above with `Compatible`
+verdicts and zero deprecated API usages. All six Safe Mode and formatting-result guard tests passed.
+The verified ZIP SHA-256 is `362fccaf5b69343f553b7885acef077f9ac2199998e2a2ffa4dcb8b1ad7a78e0`.
+Reports are in `build/reports/plugin-verifier/`; `plugin-sha256.txt` identifies the exact checked ZIP.
+These are automated binary compatibility and regression checks; manual IDE UI checks and Marketplace
+upload/review are separate. The native CLI and engine compatibility suite were not re-run for this IDE update.
+
+The three deprecated read-action usages reported for Marketplace version 0.2.1 on 2026.1.5 and
+2026.2.3 are replaced with `Application.runReadAction`. Both versions now report `Compatible` without
+those deprecated usages; the same fix was checked on 2026.3.
 
 To verify an already built ZIP against one pinned version without compiling it again:
 
 ```sh
 JAVA_HOME=/path/to/jdk21 ./gradlew verifyIdeaPlugin \
-  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.2.zip \
+  -PideaPluginZip=/absolute/path/spotless-bridge-0.2.3.zip \
   -PideaVerifyVersion=2026.2.3 -PideaSdkRoot=/path/to/sdk-root
 ```
 
@@ -120,7 +126,7 @@ binary compatibility errors, forbidden API usage and deprecated API usage fail v
 checks that the ZIP has not changed during verification. The public `Application.runReadAction` API preserves
 existing read locking and 2025.3 compatibility.
 
-CI builds the ZIP once, then six verifier jobs download the same artifact and check its SHA-256 before
+CI builds the ZIP once, then seven verifier jobs download the same artifact and check its SHA-256 before
 and after verification. SDK downloads are also hash-checked. The existing 11 engine jobs remain independent
 of IDE SDKs. The verification workflow does not publish. Tag releases reuse these checks and upload the verified
 ZIP to Marketplace; see the [release guide (Korean)](maintenance.md).

@@ -113,7 +113,7 @@ Gradle·Spotless 버전 정책 검사는 JDK 17·21의 Gradle 8.14.3 조합에�
   UTF-16LE·CRLF Gradle byte 일치, 외부 includeBuild를 포함한 설정 갱신, 동시 시작, stop과 idle 종료.
 
 엔진 CI 11개 조합은 SDK 없는 `check engineDist`를 실행합니다. 별도 IDE 빌드 job은 최소 지원 SDK인 2025.3으로
-신뢰 회귀 테스트와 ZIP 생성을 수행합니다. 이어지는 Verifier job 여섯 개는 동일한 ZIP artifact를 받아
+신뢰 회귀 테스트와 ZIP 생성을 수행합니다. 이어지는 Verifier job 일곱 개는 동일한 ZIP artifact를 받아
 각 계열의 첫 버전·최신 패치를 검사하고 ZIP 해시를 전후 비교합니다. SDK 버전·빌드·Linux SHA-256은
 `gradle/idea-compatibility.json`, Verifier 버전은 `gradle.properties`에서 관리합니다. 첫 SDK 항목이
 최소 지원 빌드와 컴파일 SDK를 결정합니다. SDK 변경 시 해시·설치 허용 범위·검사 결과를 함께 확인하세요. Verifier는 문제를 발견해도 종료 코드 0을 반환할 수 있어
@@ -156,7 +156,7 @@ Linux는 musl로 정적 링크합니다. CI는 여섯 플랫폼의 CLI를 포함
 
 `release.yml`은 `v<version>` 태그를 push하면 먼저 버전과 필요한 Secret을 검사합니다.
 이어서 같은 태그의 `verify.yml`을 호출해 네이티브 클라이언트 여섯 개, Gradle/JDK 조합,
-IntelliJ 테스트와 여섯 IDE 버전의 호환성을 검증합니다. 모든 검사가 성공해야 배포를 시작합니다.
+IntelliJ 테스트와 일곱 IDE 버전의 호환성을 검증합니다. 모든 검사가 성공해야 배포를 시작합니다.
 
 Plugin Portal → Maven Central → JetBrains Marketplace 순서로 배포합니다.
 Central은 서명한 구현 JAR와 plugin marker를 `AUTOMATIC` 방식으로 업로드하고 `PUBLISHED`까지 확인합니다.
