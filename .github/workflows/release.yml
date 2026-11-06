@@ -88,7 +88,7 @@ jobs:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: env.RELEASE_REPOSITORY != 'jetbrains-marketplace'
         with:
           pattern: native-*
@@ -101,7 +101,7 @@ jobs:
           java-version: "21"
       - name: Download verified IntelliJ ZIP
         if: env.RELEASE_REPOSITORY == 'all' || env.RELEASE_REPOSITORY == 'jetbrains-marketplace'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: spotless-bridge-intellij-zip
           path: build/distributions/
