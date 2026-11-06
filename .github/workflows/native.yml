@@ -38,7 +38,7 @@ jobs:
         run: echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"
       - name: Build and test native client and Gradle installation
         run: ./gradlew --no-daemon --console=plain testNativeCli nativeSmokeTest -PnativeTarget=${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: native-${{ matrix.platform }}
           path: build/native/
